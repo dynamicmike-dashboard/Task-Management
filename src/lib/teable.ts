@@ -204,8 +204,9 @@ export async function createTask(
     throw new Error(`Teable create error ${res.status}: ${body}`);
   }
   const data = await res.json();
-  const newRec = data.records?.[0];
-  if (!newRec) return null;
+  // Teable may return records array or a single record object
+  const newRec = data.records?.[0] || data.record || data;
+  if (!newRec || !newRec.id) return null;
   return parseRecord(newRec);
 }
 

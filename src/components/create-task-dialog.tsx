@@ -12,6 +12,7 @@ interface Props {
 export default function CreateTaskDialog({ onCreated }: Props) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const [form, setForm] = useState({
     taskDescription: "",
     taskSummary: "",
@@ -24,6 +25,7 @@ export default function CreateTaskDialog({ onCreated }: Props) {
 
   const handleSave = async () => {
     if (!form.taskDescription.trim()) return;
+    setError("");
     setSaving(true);
     const res = await createTaskAction({
       taskDescription: form.taskDescription,
@@ -39,14 +41,22 @@ export default function CreateTaskDialog({ onCreated }: Props) {
     if (res.ok && res.record) {
       onCreated(res.record);
       setOpen(false);
+      setError("");
       setForm({ taskDescription: "", taskSummary: "", assignee: "", priority: "Medium", project: "", milestone: "", estimatedEffort: 0 });
+    } else {
+      setError(res.error || "Failed to create task. Check console for details.");
     }
+  };
+
+  const handleOpen = () => {
+    setError("");
+    setOpen(true);
   };
 
   return (
     <>
       <button
-        onClick={() => setOpen(true)}
+        onClick={handleOpen}
         className="flex items-center gap-1 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 px-2.5 py-1.5 rounded-md transition-colors"
       >
         <Plus size={14} />
@@ -63,6 +73,7 @@ export default function CreateTaskDialog({ onCreated }: Props) {
               </button>
             </div>
             <div className="p-4 space-y-3">
+              {error && <p className="text-xs text-red-600 bg-red-50 rounded px-2 py-1">{error}</p>}
               <Input label="Task Description *" value={form.taskDescription} onChange={(v) => setForm({ ...form, taskDescription: v })} />
               <Input label="Task Summary" value={form.taskSummary} onChange={(v) => setForm({ ...form, taskSummary: v })} />
               <Input label="Assignee" value={form.assignee} onChange={(v) => setForm({ ...form, assignee: v })} />

@@ -37,9 +37,14 @@ export async function createTaskAction(
 ): Promise<{ ok: boolean; record?: TaskRecord; error?: string }> {
   try {
     const record = await teableCreateTask(fields);
-    return { ok: true, record: record ?? undefined };
+    if (!record) {
+      return { ok: false, error: "Task was created but the response could not be parsed." };
+    }
+    return { ok: true, record };
   } catch (e) {
-    return { ok: false, error: String(e) };
+    const msg = String(e);
+    console.error("createTaskAction error:", msg);
+    return { ok: false, error: msg };
   }
 }
 
