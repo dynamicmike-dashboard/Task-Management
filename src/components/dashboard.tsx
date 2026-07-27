@@ -30,7 +30,7 @@ export default function Dashboard({ initialTasks }: Props) {
   const [execMode, setExecMode] = useState(false);
 
   const [filters, setFilters] = useState<FilterState>({
-    progress: [], assignee: [], important: null, overdue: null, priority: [], blocked: null, search: "",
+    progress: [], assignee: [], important: null, overdue: null, search: "",
   });
 
   const [activeKpi, setActiveKpi] = useState<string | null>(null);
@@ -55,10 +55,10 @@ export default function Dashboard({ initialTasks }: Props) {
     (key: string | null) => {
       setActiveKpi(key);
       if (!key) {
-        setFilters({ progress: [], assignee: [], important: null, overdue: null, priority: [], blocked: null, search: "" });
+        setFilters({ progress: [], assignee: [], important: null, overdue: null, search: "" });
         return;
       }
-      const f: FilterState = { progress: [], assignee: [], important: null, overdue: null, priority: [], blocked: null, search: "" };
+      const f: FilterState = { progress: [], assignee: [], important: null, overdue: null, search: "" };
       switch (key) {
         case "completed": f.progress = ["Completed"]; break;
         case "inProgress": f.progress = ["In Progress"]; break;

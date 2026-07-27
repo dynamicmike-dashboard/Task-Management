@@ -12,15 +12,9 @@ const FIELD_MAP: Record<string, keyof TaskRecord> = {
   "Start Date": "startDate",
   "Expected Completion Date": "expectedCompletionDate",
   "Actual Completion Date": "actualCompletionDate",
-  "Delayed": "important",
+  "Important": "important",
   "Latest Progress Update": "latestProgressUpdate",
   "Notes": "notes",
-  "Priority": "priority",
-  "Project": "project",
-  "Milestone": "milestone",
-  "Estimated Effort": "estimatedEffort",
-  "Blocked": "blocked",
-  "Blocked Reason": "blockedReason",
 };
 
 const FIELD_IDS_CACHE = { ids: {} as Record<string, string>, loaded: false };
@@ -55,7 +49,6 @@ function parseRecord(r: TeableRecord): TaskRecord {
     if (!v) return null;
     if (typeof v === "string") return v;
 
-    // Handle { start: "2026-01-15" } or { date: "2026-01-15" } or just a date string
     if (typeof v === "object" && v !== null) {
       const obj = v as Record<string, unknown>;
       const d = obj.start || obj.date || obj.value;
@@ -77,12 +70,6 @@ function parseRecord(r: TeableRecord): TaskRecord {
     if (typeof v === "string") return v === "true" || v === "1" || v === "yes";
     return false;
   };
-  const getNum = (name: string): number => {
-    const v = f[name];
-    if (typeof v === "number") return v;
-    if (typeof v === "string") return parseFloat(v) || 0;
-    return 0;
-  };
 
   return {
     id: r.id,
@@ -95,17 +82,9 @@ function parseRecord(r: TeableRecord): TaskRecord {
     startDate: getDate("Start Date"),
     expectedCompletionDate: getDate("Expected Completion Date"),
     actualCompletionDate: getDate("Actual Completion Date"),
-    important: getBool("Delayed"),
+    important: getBool("Important"),
     latestProgressUpdate: getStr("Latest Progress Update"),
     notes: getStr("Notes"),
-    priority: (["Critical", "High", "Medium", "Low"].includes(getStr("Priority"))
-      ? getStr("Priority")
-      : "Medium") as TaskRecord["priority"],
-    project: getStr("Project"),
-    milestone: getStr("Milestone"),
-    estimatedEffort: getNum("Estimated Effort"),
-    blocked: getBool("Blocked"),
-    blockedReason: getStr("Blocked Reason"),
   };
 }
 
@@ -204,7 +183,6 @@ export async function createTask(
     throw new Error(`Teable create error ${res.status}: ${body}`);
   }
   const data = await res.json();
-  // Teable may return records array or a single record object
   const newRec = data.records?.[0] || data.record || data;
   if (!newRec || !newRec.id) return null;
   return parseRecord(newRec);

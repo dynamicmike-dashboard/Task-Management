@@ -45,7 +45,7 @@ export default function FilterPresets({ filters, onApply }: Props) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
   };
 
-  const hasActive = filters.progress.length > 0 || filters.assignee.length > 0 || filters.important !== null || filters.overdue !== null || filters.priority.length > 0 || filters.blocked !== null;
+  const hasActive = filters.progress.length > 0 || filters.assignee.length > 0 || filters.important !== null || filters.overdue !== null;
 
   return (
     <div className="flex items-center gap-1.5 flex-wrap">

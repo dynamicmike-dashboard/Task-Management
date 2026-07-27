@@ -55,11 +55,6 @@ export function computeRisk(task: TaskRecord): RiskScore {
     factors.push("stale update");
   }
 
-  if (task.blocked) {
-    score += 10;
-    factors.push("blocked");
-  }
-
   let level: RiskScore["level"] = "Low";
   if (score >= 50) level = "Critical";
   else if (score >= 30) level = "High";

@@ -108,10 +108,6 @@ export default function TaskSidePanel({ task, onClose, onUpdated }: Props) {
         {field("Task Summary", task.taskSummary, "taskSummary")}
         {field("Assignee", task.assignee, "assignee")}
         {field("Progress", task.progress, "progress", "select", ["Not Started", "In Progress", "Completed"])}
-        {field("Priority", task.priority, "priority", "select", ["Critical", "High", "Medium", "Low"])}
-        {field("Project", task.project, "project")}
-        {field("Milestone", task.milestone, "milestone")}
-        {field("Estimated Effort (hrs)", task.estimatedEffort, "estimatedEffort", "number")}
 
         <div className={`px-4 py-2 ${"important" in form ? "bg-amber-50 -mx-1 px-5 rounded border border-amber-200" : ""}`}>
           <label className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Important</label>
@@ -127,27 +123,6 @@ export default function TaskSidePanel({ task, onClose, onUpdated }: Props) {
             </label>
           </div>
         </div>
-
-        <div className={`px-4 py-2 ${"blocked" in form ? "bg-amber-50 -mx-1 px-5 rounded border border-amber-200" : ""}`}>
-          <label className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Blocked</label>
-          <div className="mt-0.5">
-            <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={"blocked" in form ? form.blocked as boolean : task.blocked}
-                onChange={(e) => handleChange("blocked", e.target.checked)}
-                className="rounded"
-              />
-              Task is blocked
-            </label>
-          </div>
-        </div>
-
-        {"blocked" in form && form.blocked ? (
-          field("Blocked Reason", task.blockedReason, "blockedReason")
-        ) : !("blocked" in form) && task.blocked ? (
-          field("Blocked Reason", task.blockedReason, "blockedReason")
-        ) : null}
 
         {field("Start Date", task.startDate || "", "startDate", "date")}
         {field("Expected Completion Date", task.expectedCompletionDate || "", "expectedCompletionDate", "date")}

@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import { ArrowUpDown, ArrowUp, ArrowDown, Search } from "lucide-react";
 import { TaskRecord, Progress, FilterState } from "@/lib/types";
 import { isOverdue, matchesFilters } from "@/lib/filters";
-import { computeRisk, riskColor } from "@/lib/risk";
+import { computeRisk } from "@/lib/risk";
 import { updateTask } from "@/app/actions/teable";
 
 interface Props {
@@ -16,13 +16,12 @@ interface Props {
   onSelect: (task: TaskRecord) => void;
 }
 
-type SortKey = keyof Pick<TaskRecord, "taskDescription" | "assignee" | "progress" | "priority" | "expectedCompletionDate" | "startDate">;
+type SortKey = keyof Pick<TaskRecord, "taskDescription" | "assignee" | "progress" | "expectedCompletionDate" | "startDate">;
 
 const SORT_LABELS: Record<SortKey, string> = {
   taskDescription: "Task",
   assignee: "Assignee",
   progress: "Status",
-  priority: "Priority",
   expectedCompletionDate: "Due",
   startDate: "Start",
 };
@@ -46,9 +45,6 @@ export default function TaskTable({ tasks, filters, onFilters, selected, onToggl
       let cmp = 0;
       if (sortKey === "progress") {
         cmp = PROGRESS_ORDER[a.progress] - PROGRESS_ORDER[b.progress];
-      } else if (sortKey === "priority") {
-        const order = { Critical: 0, High: 1, Medium: 2, Low: 3 };
-        cmp = (order[a.priority] ?? 2) - (order[b.priority] ?? 2);
       } else if (sortKey === "expectedCompletionDate" || sortKey === "startDate") {
         const da = a[sortKey] || "";
         const db = b[sortKey] || "";
@@ -131,9 +127,9 @@ export default function TaskTable({ tasks, filters, onFilters, selected, onToggl
             <input type="checkbox" checked={filters.overdue === true} onChange={(e) => onFilters({ ...filters, overdue: e.target.checked ? true : null })} className="rounded" />
             Overdue
           </label>
-          {(filters.progress.length > 0 || filters.assignee.length > 0 || filters.important !== null || filters.overdue !== null || filters.search || filters.priority.length > 0) && (
+          {(filters.progress.length > 0 || filters.assignee.length > 0 || filters.important !== null || filters.overdue !== null || filters.search) && (
             <button
-              onClick={() => onFilters({ progress: [], assignee: [], important: null, overdue: null, priority: [], blocked: null, search: "" })}
+              onClick={() => onFilters({ progress: [], assignee: [], important: null, overdue: null, search: "" })}
               className="text-xs text-blue-600 hover:text-blue-800"
             >
               Clear filters
@@ -179,7 +175,7 @@ export default function TaskTable({ tasks, filters, onFilters, selected, onToggl
                   </div>
                 </th>
               ))}
-              <th className="px-2 py-1.5">Quick</th>
+              <th className="px-2 py-1.5 text-left font-medium text-slate-400">Quick</th>
             </tr>
           </thead>
           <tbody>
@@ -203,7 +199,6 @@ export default function TaskTable({ tasks, filters, onFilters, selected, onToggl
                     <div className="flex items-center gap-1">
                       {overdue && <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" title="Overdue" />}
                       {task.important && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" title="Important" />}
-                      {task.blocked && <span className="w-1.5 h-1.5 rounded-full bg-purple-400 shrink-0" title="Blocked" />}
                       <span className="truncate">{task.taskDescription}</span>
                     </div>
                   </td>
@@ -215,15 +210,6 @@ export default function TaskTable({ tasks, filters, onFilters, selected, onToggl
                       "text-slate-500 bg-slate-50"
                     }`}>
                       {task.progress}
-                    </span>
-                  </td>
-                  <td className="px-2 py-1" onClick={() => onSelect(task)}>
-                    <span className={`text-[10px] font-medium ${
-                      task.priority === "Critical" ? "text-red-600" :
-                      task.priority === "High" ? "text-orange-600" :
-                      task.priority === "Medium" ? "text-amber-600" : "text-slate-400"
-                    }`}>
-                      {task.priority}
                     </span>
                   </td>
                   <td className="px-2 py-1 text-slate-400 tabular-nums" onClick={() => onSelect(task)}>
@@ -263,7 +249,7 @@ export default function TaskTable({ tasks, filters, onFilters, selected, onToggl
             })}
             {sorted.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-xs text-slate-400">
+                <td colSpan={7} className="px-4 py-8 text-center text-xs text-slate-400">
                   No tasks match the current filters
                 </td>
               </tr>

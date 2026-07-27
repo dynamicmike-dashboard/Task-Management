@@ -17,10 +17,6 @@ export default function CreateTaskDialog({ onCreated }: Props) {
     taskDescription: "",
     taskSummary: "",
     assignee: "",
-    priority: "Medium" as TaskRecord["priority"],
-    project: "",
-    milestone: "",
-    estimatedEffort: 0,
   });
 
   const handleSave = async () => {
@@ -31,10 +27,6 @@ export default function CreateTaskDialog({ onCreated }: Props) {
       taskDescription: form.taskDescription,
       taskSummary: form.taskSummary,
       assignee: form.assignee,
-      priority: form.priority,
-      project: form.project,
-      milestone: form.milestone,
-      estimatedEffort: form.estimatedEffort,
       progress: "Not Started",
     });
     setSaving(false);
@@ -42,7 +34,7 @@ export default function CreateTaskDialog({ onCreated }: Props) {
       onCreated(res.record);
       setOpen(false);
       setError("");
-      setForm({ taskDescription: "", taskSummary: "", assignee: "", priority: "Medium", project: "", milestone: "", estimatedEffort: 0 });
+      setForm({ taskDescription: "", taskSummary: "", assignee: "" });
     } else {
       setError(res.error || "Failed to create task. Check console for details.");
     }
@@ -77,14 +69,6 @@ export default function CreateTaskDialog({ onCreated }: Props) {
               <Input label="Task Description *" value={form.taskDescription} onChange={(v) => setForm({ ...form, taskDescription: v })} />
               <Input label="Task Summary" value={form.taskSummary} onChange={(v) => setForm({ ...form, taskSummary: v })} />
               <Input label="Assignee" value={form.assignee} onChange={(v) => setForm({ ...form, assignee: v })} />
-              <div className="grid grid-cols-2 gap-3">
-                <Select label="Priority" value={form.priority} options={["Critical", "High", "Medium", "Low"]} onChange={(v) => setForm({ ...form, priority: v as TaskRecord["priority"] })} />
-                <Input label="Project" value={form.project} onChange={(v) => setForm({ ...form, project: v })} />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <Input label="Milestone" value={form.milestone} onChange={(v) => setForm({ ...form, milestone: v })} />
-                <Input label="Est. Effort (hrs)" type="number" value={String(form.estimatedEffort)} onChange={(v) => setForm({ ...form, estimatedEffort: parseFloat(v) || 0 })} />
-              </div>
             </div>
             <div className="flex justify-end gap-2 px-4 py-3 border-t border-slate-100">
               <button onClick={() => setOpen(false)} className="text-xs px-3 py-1.5 rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50">Cancel</button>
@@ -104,17 +88,6 @@ function Input({ label, value, onChange, type = "text" }: { label: string; value
     <div>
       <label className="text-xs font-medium text-slate-500 mb-0.5 block">{label}</label>
       <input type={type} value={value} onChange={(e) => onChange(e.target.value)} className="w-full text-xs border border-slate-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400" />
-    </div>
-  );
-}
-
-function Select({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (v: string) => void }) {
-  return (
-    <div>
-      <label className="text-xs font-medium text-slate-500 mb-0.5 block">{label}</label>
-      <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full text-xs border border-slate-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white">
-        {options.map((o) => <option key={o} value={o}>{o}</option>)}
-      </select>
     </div>
   );
 }
