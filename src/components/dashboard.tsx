@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { RefreshCw, Loader2, Eye, EyeOff, Columns3, LayoutDashboard, Clock } from "lucide-react";
+import { RefreshCw, Loader2, Eye, EyeOff, Columns3, LayoutDashboard, Clock, CalendarDays, Archive } from "lucide-react";
 import { TaskRecord, FilterState } from "@/lib/types";
 import { getTasks } from "@/app/actions/teable";
 import { matchesFilters } from "@/lib/filters";
@@ -19,6 +19,9 @@ import CreateTaskDialog from "@/components/create-task-dialog";
 import BulkUpdateDialog from "@/components/bulk-update-dialog";
 import FilterPresets from "@/components/filter-presets";
 import KanbanBoard from "@/components/kanban-board";
+import CalendarView from "@/components/calendar-view";
+import ArchiveView from "@/components/archive-view";
+import SettingsDialog from "@/components/settings-dialog";
 
 interface Props {
   initialTasks: TaskRecord[];
@@ -32,16 +35,19 @@ export default function Dashboard({ initialTasks }: Props) {
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
   const [filters, setFilters] = useState<FilterState>({
-    progress: [], assignee: [], important: null, overdue: null, search: "",
+    progress: [], assignee: [], important: null, overdue: null, search: "", blocked: null, priority: [],
   });
 
-  const [view, setView] = useState<"dashboard" | "kanban">("dashboard");
+  const [view, setView] = useState<"dashboard" | "kanban" | "calendar" | "archive">("dashboard");
   const [activeKpi, setActiveKpi] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [sidePanelTask, setSidePanelTask] = useState<TaskRecord | null>(null);
 
+  const active = tasks.filter((t) => !t.archived);
+  const archived = tasks.filter((t) => t.archived);
+
   const filtered = useMemo(
-    () => tasks.filter((t) => matchesFilters(t, filters)),
+    () => tasks.filter((t) => matchesFilters(t, filters) && !t.archived),
     [tasks, filters]
   );
 
@@ -62,26 +68,24 @@ export default function Dashboard({ initialTasks }: Props) {
     return () => clearInterval(timer);
   }, [refresh]);
 
-  const handleKpiFilter = useCallback(
-    (key: string | null) => {
-      setActiveKpi(key);
-      if (!key) {
-        setFilters({ progress: [], assignee: [], important: null, overdue: null, search: "" });
-        return;
-      }
-      const f: FilterState = { progress: [], assignee: [], important: null, overdue: null, search: "" };
-      switch (key) {
-        case "completed": f.progress = ["Completed"]; break;
-        case "inProgress": f.progress = ["In Progress"]; break;
-        case "notStarted": f.progress = ["Not Started"]; break;
-        case "overdue": f.overdue = true; break;
-        case "important": f.important = true; break;
-        default: break;
-      }
-      setFilters(f);
-    },
-    []
-  );
+  const handleKpiFilter = useCallback((key: string | null) => {
+    setActiveKpi(key);
+    if (!key) {
+      setFilters({ progress: [], assignee: [], important: null, overdue: null, search: "", blocked: null, priority: [] });
+      return;
+    }
+    const f: FilterState = { progress: [], assignee: [], important: null, overdue: null, search: "", blocked: null, priority: [] };
+    switch (key) {
+      case "completed": f.progress = ["Completed"]; break;
+      case "inProgress": f.progress = ["In Progress"]; break;
+      case "notStarted": f.progress = ["Not Started"]; break;
+      case "overdue": f.overdue = true; break;
+      case "important": f.important = true; break;
+      case "blocked": f.blocked = true; break;
+      default: break;
+    }
+    setFilters(f);
+  }, []);
 
   const handleChartFilter = useCallback((value: string | null) => {
     if (!value) return;
@@ -128,9 +132,12 @@ export default function Dashboard({ initialTasks }: Props) {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h1 className="text-base font-semibold text-slate-800 flex items-center gap-2">
-            {view === "kanban" ? "Kanban Board" : "Dashboard"}
+            {view === "kanban" ? "Kanban Board" :
+             view === "calendar" ? "Calendar" :
+             view === "archive" ? "Archive" :
+             "Dashboard"}
             <span className="text-[10px] font-normal text-slate-400 bg-slate-100 rounded-full px-2 py-0.5">
-              {tasks.length} tasks
+              {view === "archive" ? `${archived.length} archived` : `${active.length} tasks`}
             </span>
           </h1>
           <p className="text-[10px] text-slate-400 flex items-center gap-1">
@@ -141,10 +148,16 @@ export default function Dashboard({ initialTasks }: Props) {
         <div className="flex items-center gap-1.5">
           <div className="flex bg-slate-100 rounded-lg p-0.5 text-xs">
             <button onClick={() => setView("dashboard")} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md transition-all ${view === "dashboard" ? "bg-white text-slate-800 shadow-sm font-medium" : "text-slate-500 hover:text-slate-700"}`}>
-              <LayoutDashboard size={14} /> Dashboard
+              <LayoutDashboard size={14} /> Dash
             </button>
             <button onClick={() => setView("kanban")} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md transition-all ${view === "kanban" ? "bg-white text-slate-800 shadow-sm font-medium" : "text-slate-500 hover:text-slate-700"}`}>
-              <Columns3 size={14} /> Kanban
+              <Columns3 size={14} /> Board
+            </button>
+            <button onClick={() => setView("calendar")} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md transition-all ${view === "calendar" ? "bg-white text-slate-800 shadow-sm font-medium" : "text-slate-500 hover:text-slate-700"}`}>
+              <CalendarDays size={14} /> Calendar
+            </button>
+            <button onClick={() => setView("archive")} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md transition-all ${view === "archive" ? "bg-white text-slate-800 shadow-sm font-medium" : "text-slate-500 hover:text-slate-700"}`}>
+              <Archive size={14} /> Archive
             </button>
           </div>
           {view === "dashboard" && (
@@ -160,37 +173,36 @@ export default function Dashboard({ initialTasks }: Props) {
               </button>
             </>
           )}
+          <SettingsDialog />
           <CreateTaskDialog onCreated={handleCreated} />
-          <button
-            onClick={refresh}
-            disabled={loading}
-            title="Refresh data"
-            className="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-50 flex items-center gap-1"
-          >
-            {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-          </button>
+          {view === "archive" && (
+            <button onClick={refresh} disabled={loading} title="Refresh" className="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-50 flex items-center gap-1">
+              {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+            </button>
+          )}
         </div>
       </div>
 
       {view === "kanban" ? (
-        <KanbanBoard tasks={tasks} onSelect={setSidePanelTask} onRefresh={refresh} />
+        <KanbanBoard tasks={active} onSelect={setSidePanelTask} onRefresh={refresh} />
+      ) : view === "calendar" ? (
+        <CalendarView tasks={active} onSelect={setSidePanelTask} />
+      ) : view === "archive" ? (
+        <ArchiveView tasks={tasks} onRefresh={refresh} onSelect={setSidePanelTask} />
       ) : execMode ? (
-        <ExecutiveMode tasks={tasks} onSelect={setSidePanelTask} />
+        <ExecutiveMode tasks={active} onSelect={setSidePanelTask} />
       ) : (
         <>
-          <KpiTiles tasks={tasks} activeFilter={activeKpi} onFilter={handleKpiFilter} />
-
-          <DeliveryHealth tasks={tasks} />
-
+          <KpiTiles tasks={active} activeFilter={activeKpi} onFilter={handleKpiFilter} />
+          <DeliveryHealth tasks={active} />
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <WorkloadChart tasks={tasks} onFilter={handleChartFilter} />
-            <TimelineView tasks={tasks} onSelect={setSidePanelTask} />
+            <WorkloadChart tasks={active} onFilter={handleChartFilter} />
+            <TimelineView tasks={active} onSelect={setSidePanelTask} />
           </div>
-
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <StatusDistribution tasks={tasks} onFilter={handleChartFilter} />
-            <TrendChart tasks={tasks} />
-            <AttentionQueue tasks={tasks} onSelect={setSidePanelTask} />
+            <StatusDistribution tasks={active} onFilter={handleChartFilter} />
+            <TrendChart tasks={active} />
+            <AttentionQueue tasks={active} onSelect={setSidePanelTask} />
           </div>
         </>
       )}
@@ -199,12 +211,12 @@ export default function Dashboard({ initialTasks }: Props) {
         <>
           <BulkUpdateDialog
             selected={selected}
-            tasks={tasks}
+            tasks={active}
             onDone={refresh}
             onClear={() => setSelected(new Set())}
           />
           <TaskTable
-            tasks={tasks}
+            tasks={active}
             filters={filters}
             onFilters={setFilters}
             selected={selected}

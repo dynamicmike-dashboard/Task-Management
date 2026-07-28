@@ -22,5 +22,7 @@ export function matchesFilters(record: TaskRecord, filters: FilterState): boolea
   if (filters.assignee.length > 0 && !filters.assignee.includes(record.assignee)) return false;
   if (filters.important !== null && record.important !== filters.important) return false;
   if (filters.overdue !== null && isOverdue(record) !== filters.overdue) return false;
+  if (filters.blocked !== null && record.blocked !== filters.blocked) return false;
+  if (filters.priority.length > 0 && !filters.priority.includes(record.priority)) return false;
   return true;
 }

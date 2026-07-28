@@ -4,52 +4,82 @@ export function computeRisk(task: TaskRecord): RiskScore {
   const factors: string[] = [];
   let score = 0;
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
   if (task.progress === "Completed") {
     return { level: "None", score: 0, factors: [] };
   }
 
-  const due = task.expectedCompletionDate ? new Date(task.expectedCompletionDate) : null;
-  const start = task.startDate ? new Date(task.startDate) : null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
+  // Priority
+  const priorityScores: Record<string, number> = { Low: 0, Medium: 5, High: 15, Critical: 25 };
+  score += priorityScores[task.priority] || 0;
+  if (task.priority === "Critical") factors.push("critical priority");
+  else if (task.priority === "High") factors.push("high priority");
+
+  // Blocked
+  if (task.blocked) {
+    score += 20;
+    factors.push(task.blockedReason ? `blocked: ${task.blockedReason}` : "blocked");
+  }
+
+  // Overdue / approaching deadline
+  const due = task.expectedCompletionDate ? new Date(task.expectedCompletionDate) : null;
   if (due) {
     due.setHours(0, 0, 0, 0);
     const daysOverdue = Math.floor((today.getTime() - due.getTime()) / 86400000);
     if (daysOverdue > 0) {
       score += Math.min(daysOverdue * 8, 40);
       factors.push(`${daysOverdue} day${daysOverdue > 1 ? "s" : ""} overdue`);
-    } else if (daysOverdue > -7) {
+    } else if (daysOverdue >= -3) {
       const daysRemaining = -daysOverdue;
-      score += (7 - daysRemaining) * 3;
+      score += (4 - daysRemaining) * 5;
       if (daysRemaining <= 2) factors.push(`${daysRemaining} day${daysRemaining > 1 ? "s" : ""} remaining`);
     }
   }
 
+  // Progress vs deadline
   if (task.progress === "Not Started") {
-    score += 10;
-    factors.push("not started");
+    if (due && due <= today) {
+      score += 15;
+      factors.push("not started and overdue");
+    } else {
+      score += 5;
+      factors.push("not started");
+    }
   } else if (task.progress === "In Progress") {
+    const start = task.startDate ? new Date(task.startDate) : null;
     if (due && start) {
       const total = due.getTime() - start.getTime();
-      const elapsed = today.getTime() - start.getTime();
-      const pct = elapsed / total;
-      if (pct > 1) {
-        score += 10;
-        factors.push("past deadline");
-      } else if (pct > 0.75) {
-        score += 5;
-        factors.push("behind schedule");
+      if (total > 0) {
+        const elapsed = today.getTime() - start.getTime();
+        const pct = elapsed / total;
+        if (pct > 1) {
+          score += 10;
+          factors.push("past deadline");
+        } else if (pct > 0.75) {
+          score += 5;
+          factors.push("behind schedule");
+        }
       }
     }
   }
 
+  // Important
   if (task.important) {
-    score += 15;
+    score += 10;
     factors.push("important");
   }
 
+  // % Complete
+  if (task.percentComplete > 0 && task.percentComplete < 100) {
+    if (task.percentComplete < 25) {
+      score += 5;
+      factors.push("early stage");
+    }
+  }
+
+  // Stale progress update
   if (!task.latestProgressUpdate || task.latestProgressUpdate.trim().length < 10) {
     score += 5;
     factors.push("stale update");

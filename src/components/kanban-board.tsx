@@ -11,7 +11,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { Plus, X, MoreHorizontal, GripVertical, Check, Trash2, Edit3 } from "lucide-react";
 import { TaskRecord } from "@/lib/types";
-import { updateTask, deleteTaskAction, createTaskAction } from "@/app/actions/teable";
+import { updateTask, archiveTask, createTaskAction } from "@/app/actions/teable";
 import { isOverdue } from "@/lib/filters";
 
 const COLUMNS = [
@@ -71,15 +71,20 @@ function SortableCard({
   return (
     <div
       ref={setNodeRef} style={style}
-      className={`rounded-md border-l-2 border ${color} bg-white shadow-sm text-xs ${
+      className={`rounded-md border-l-2 ${task.blocked ? "border-l-red-500" : overdue ? "border-l-red-400" : task.important ? "border-l-amber-400" : "border-l-slate-300"} border ${color} bg-white shadow-sm text-xs ${
         isDragging ? "opacity-50 z-50 shadow-lg rotate-2" : ""
-      } ${overdue ? "border-l-red-400" : task.important ? "border-l-amber-400" : "border-l-slate-300"}`}
+      }`}
     >
       <div className="flex items-start gap-1 p-2">
         <button {...attributes} {...listeners} className="text-slate-300 hover:text-slate-500 mt-0.5 cursor-grab active:cursor-grabbing touch-none" title="Drag to reorder">
           <GripVertical size={12} />
         </button>
         <div className="flex-1 min-w-0" onClick={onSelect}>
+          <div className="flex items-center gap-1">
+            {task.priority === "Critical" && <span className="text-[9px] font-bold text-red-600">CRT</span>}
+            {task.priority === "High" && <span className="text-[9px] font-medium text-orange-600">HI</span>}
+            {task.blocked && <span className="text-[9px] font-medium text-red-500">BLOCKED</span>}
+          </div>
           <div className="font-medium text-slate-800 truncate">{task.taskDescription}</div>
           <div className="text-[10px] text-slate-400 mt-0.5">
             {task.assignee && <span>{task.assignee}</span>}
@@ -87,6 +92,11 @@ function SortableCard({
               <span> &middot; Due {new Date(task.expectedCompletionDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</span>
             )}
           </div>
+          {task.percentComplete > 0 && (
+            <div className="mt-1 h-1 w-full bg-slate-100 rounded-full overflow-hidden">
+              <div className="h-full rounded-full bg-blue-400" style={{ width: `${task.percentComplete}%` }} />
+            </div>
+          )}
           {task.latestProgressUpdate && (
             <div className="text-[10px] text-slate-500 mt-0.5 line-clamp-1">{task.latestProgressUpdate}</div>
           )}
@@ -117,7 +127,7 @@ function SortableCard({
                 </div>
               </div>
               <div className="border-t border-slate-100 p-1">
-                <button onClick={onDelete} className="w-full flex items-center gap-1 px-2 py-1 hover:bg-red-50 rounded text-red-600"><Trash2 size={10} /> Delete</button>
+                <button onClick={onDelete} className="w-full flex items-center gap-1 px-2 py-1 hover:bg-slate-50 rounded text-slate-600"><Trash2 size={10} /> Archive</button>
               </div>
             </div>
           )}
@@ -231,9 +241,9 @@ export default function KanbanBoard({ tasks, onSelect, onRefresh }: Props) {
     setCardColors((o) => ({ ...o, [taskId]: colorId }));
   };
 
-  const handleDelete = async (task: TaskRecord) => {
-    if (!confirm(`Delete "${task.taskDescription}"?`)) return;
-    await deleteTaskAction(task.id);
+  const handleArchive = async (task: TaskRecord) => {
+    if (!confirm(`Archive "${task.taskDescription}"?`)) return;
+    await archiveTask(task.id);
     setLocalTasks((prev) => prev.filter((t) => t.id !== task.id));
     onRefresh();
   };
@@ -303,7 +313,7 @@ export default function KanbanBoard({ tasks, onSelect, onRefresh }: Props) {
                           color={`${colorDef.bg} ${colorDef.border}`}
                           labels={labels}
                           onSelect={() => onSelect(task)}
-                          onDelete={() => handleDelete(task)}
+                          onDelete={() => handleArchive(task)}
                           onColorChange={(c) => handleColorChange(task.id, c)}
                           onQuickMove={(p) => handleQuickMove(task, p)}
                         />

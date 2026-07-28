@@ -1,5 +1,6 @@
 export type Progress = "Completed" | "In Progress" | "Not Started";
 export type RiskLevel = "Critical" | "High" | "Medium" | "Low" | "None";
+export type Priority = "Low" | "Medium" | "High" | "Critical";
 
 export interface TaskRecord {
   id: string;
@@ -13,6 +14,32 @@ export interface TaskRecord {
   important: boolean;
   latestProgressUpdate: string;
   notes: string;
+  archived: boolean;
+  priority: Priority;
+  blocked: boolean;
+  blockedReason: string;
+  percentComplete: number;
+  estimatedHours: number;
+  actualHours: number;
+}
+
+export interface ActivityRecord {
+  id: string;
+  taskId: string;
+  action: string;
+  field: string;
+  oldValue: string;
+  newValue: string;
+  timestamp: string;
+}
+
+export interface DashboardSettings {
+  id: string;
+  workspaceName: string;
+  clientName: string;
+  logoUrl: string;
+  accentColor: string;
+  isMaster: boolean;
 }
 
 export interface RiskScore {
@@ -27,6 +54,8 @@ export interface FilterState {
   important: boolean | null;
   overdue: boolean | null;
   search: string;
+  blocked: boolean | null;
+  priority: Priority[];
 }
 
 export interface FilterPreset {

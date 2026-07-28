@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { ArrowUpDown, ArrowUp, ArrowDown, Search, Star, Trash2, Circle, Clock, CheckCircle2 } from "lucide-react";
-import { TaskRecord, Progress, FilterState } from "@/lib/types";
+import { ArrowUpDown, ArrowUp, ArrowDown, Search, Star, Trash2, Circle, Clock, CheckCircle2, AlertTriangle, Archive } from "lucide-react";
+import { TaskRecord, Progress, FilterState, Priority } from "@/lib/types";
 import { isOverdue, matchesFilters } from "@/lib/filters";
 import { computeRisk } from "@/lib/risk";
-import { updateTask, deleteTaskAction } from "@/app/actions/teable";
+import { updateTask, archiveTask } from "@/app/actions/teable";
 
 interface Props {
   tasks: TaskRecord[];
@@ -73,10 +73,10 @@ export default function TaskTable({ tasks, filters, onFilters, selected, onToggl
     setSavingId(null);
   };
 
-  const handleDelete = async (task: TaskRecord) => {
-    if (!confirm(`Delete "${task.taskDescription}"?`)) return;
+  const handleArchive = async (task: TaskRecord) => {
+    if (!confirm(`Archive "${task.taskDescription}"?`)) return;
     setSavingId(task.id);
-    await deleteTaskAction(task.id);
+    await archiveTask(task.id);
     setSavingId(null);
   };
 
@@ -158,9 +158,26 @@ export default function TaskTable({ tasks, filters, onFilters, selected, onToggl
             <input type="checkbox" checked={filters.overdue === true} onChange={(e) => onFilters({ ...filters, overdue: e.target.checked ? true : null })} className="rounded" />
             Overdue
           </label>
-          {(filters.progress.length > 0 || filters.assignee.length > 0 || filters.important !== null || filters.overdue !== null || filters.search) && (
+          <label className="flex items-center gap-1.5 text-xs text-slate-500 cursor-pointer px-2 py-1 rounded hover:bg-slate-50">
+            <input type="checkbox" checked={filters.blocked === true} onChange={(e) => onFilters({ ...filters, blocked: e.target.checked ? true : null })} className="rounded" />
+            Blocked
+          </label>
+          <select
+            value=""
+            onChange={(e) => {
+              const val = e.target.value as Priority;
+              if (!val) return;
+              onFilters({ ...filters, priority: filters.priority.includes(val) ? filters.priority : [...filters.priority, val] });
+              e.target.value = "";
+            }}
+            className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white"
+          >
+            <option value="">Priority...</option>
+            {(["Critical", "High", "Medium", "Low"] as const).map((p) => <option key={p} value={p}>{p}</option>)}
+          </select>
+          {(filters.progress.length > 0 || filters.assignee.length > 0 || filters.important !== null || filters.overdue !== null || filters.search || filters.blocked !== null || filters.priority.length > 0) && (
             <button
-              onClick={() => onFilters({ progress: [], assignee: [], important: null, overdue: null, search: "" })}
+              onClick={() => onFilters({ progress: [], assignee: [], important: null, overdue: null, search: "", blocked: null, priority: [] })}
               className="text-xs text-blue-600 hover:text-blue-800 font-medium"
             >
               Clear
@@ -259,9 +276,23 @@ export default function TaskTable({ tasks, filters, onFilters, selected, onToggl
                     />
                   </td>
                   <td className="px-2 py-2 max-w-[250px]" onClick={() => onSelect(task)}>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1">
                       {overdue && <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" title="Overdue" />}
                       {task.important && <Star size={11} className="text-amber-500 shrink-0" />}
+                      {task.blocked && <span title={`Blocked: ${task.blockedReason || ""}`}><AlertTriangle size={11} className="text-red-500 shrink-0" /></span>}
+                      {!isEditing && (
+                        <span className={`text-[10px] font-medium mr-0.5 ${
+                          task.priority === "Critical" ? "text-red-600" :
+                          task.priority === "High" ? "text-orange-600" :
+                          task.priority === "Medium" ? "text-amber-600" :
+                          "text-slate-400"
+                        }`}>
+                          {task.priority === "Critical" ? "CRT" :
+                           task.priority === "High" ? "HI" :
+                           task.priority === "Medium" ? "MED" :
+                           "LOW"}
+                        </span>
+                      )}
                       {isEditing ? (
                         <input
                           type="text"
@@ -295,14 +326,19 @@ export default function TaskTable({ tasks, filters, onFilters, selected, onToggl
                     {task.assignee || <span className="text-slate-300">—</span>}
                   </td>
                   <td className="px-2 py-2" onClick={() => onSelect(task)}>
-                    <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
-                      task.progress === "Completed" ? "text-emerald-700 bg-emerald-50" :
-                      task.progress === "In Progress" ? "text-blue-700 bg-blue-50" :
-                      "text-slate-500 bg-slate-100"
-                    }`}>
-                      <StatusIcon progress={task.progress} />
-                      {task.progress}
-                    </span>
+                    <div className="flex items-center gap-1">
+                      <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
+                        task.progress === "Completed" ? "text-emerald-700 bg-emerald-50" :
+                        task.progress === "In Progress" ? "text-blue-700 bg-blue-50" :
+                        "text-slate-500 bg-slate-100"
+                      }`}>
+                        <StatusIcon progress={task.progress} />
+                        {task.progress}
+                      </span>
+                      {task.blocked && (
+                        <span className="text-[9px] text-red-600 bg-red-50 rounded px-1 py-0.5 font-medium">BLOCKED</span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-2 py-2 text-slate-400 tabular-nums" onClick={() => onSelect(task)}>
                     {task.expectedCompletionDate
@@ -334,12 +370,17 @@ export default function TaskTable({ tasks, filters, onFilters, selected, onToggl
                       >
                         <Star size={12} />
                       </button>
+                      {task.percentComplete > 0 && (
+                        <div className="w-8 h-1 bg-slate-100 rounded-full overflow-hidden shrink-0">
+                          <div className="h-full bg-blue-400 rounded-full" style={{ width: `${task.percentComplete}%` }} />
+                        </div>
+                      )}
                       <button
-                        onClick={() => handleDelete(task)}
-                        className="p-1 rounded-md text-slate-300 opacity-0 group-hover:opacity-100 hover:text-red-500 hover:bg-red-50 transition-all"
-                        title="Delete task"
+                        onClick={() => handleArchive(task)}
+                        className="p-1 rounded-md text-slate-300 opacity-0 group-hover:opacity-100 hover:text-slate-500 hover:bg-slate-100 transition-all"
+                        title="Archive task"
                       >
-                        <Trash2 size={12} />
+                        <Archive size={12} />
                       </button>
                     </div>
                   </td>
