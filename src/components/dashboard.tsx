@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
-import { RefreshCw, Loader2, Eye, EyeOff, Columns3, LayoutDashboard } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { RefreshCw, Loader2, Eye, EyeOff, Columns3, LayoutDashboard, Clock } from "lucide-react";
 import { TaskRecord, FilterState } from "@/lib/types";
 import { getTasks } from "@/app/actions/teable";
 import { matchesFilters } from "@/lib/filters";
@@ -29,6 +29,7 @@ export default function Dashboard({ initialTasks }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [execMode, setExecMode] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
   const [filters, setFilters] = useState<FilterState>({
     progress: [], assignee: [], important: null, overdue: null, search: "",
@@ -49,9 +50,17 @@ export default function Dashboard({ initialTasks }: Props) {
     setError("");
     const res = await getTasks();
     if (res.error) setError(res.error);
-    else setTasks(res.tasks);
+    else {
+      setTasks(res.tasks);
+      setLastUpdated(new Date());
+    }
     setLoading(false);
   }, []);
+
+  useEffect(() => {
+    const timer = setInterval(refresh, 60000);
+    return () => clearInterval(timer);
+  }, [refresh]);
 
   const handleKpiFilter = useCallback(
     (key: string | null) => {
@@ -115,19 +124,26 @@ export default function Dashboard({ initialTasks }: Props) {
   }
 
   return (
-    <div className="space-y-3">
-      {/* Header */}
+    <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
-          <h1 className="text-base font-semibold text-slate-800">Task Operations</h1>
-          <p className="text-[10px] text-slate-400">{tasks.length} tasks &middot; Last updated just now</p>
+          <h1 className="text-base font-semibold text-slate-800 flex items-center gap-2">
+            {view === "kanban" ? "Kanban Board" : "Dashboard"}
+            <span className="text-[10px] font-normal text-slate-400 bg-slate-100 rounded-full px-2 py-0.5">
+              {tasks.length} tasks
+            </span>
+          </h1>
+          <p className="text-[10px] text-slate-400 flex items-center gap-1">
+            <Clock size={10} />
+            Updated {lastUpdated.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+          </p>
         </div>
         <div className="flex items-center gap-1.5">
-          <div className="flex bg-slate-100 rounded-md p-0.5 text-xs mr-1">
-            <button onClick={() => setView("dashboard")} className={`flex items-center gap-1 px-2 py-1 rounded transition-colors ${view === "dashboard" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
+          <div className="flex bg-slate-100 rounded-lg p-0.5 text-xs">
+            <button onClick={() => setView("dashboard")} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md transition-all ${view === "dashboard" ? "bg-white text-slate-800 shadow-sm font-medium" : "text-slate-500 hover:text-slate-700"}`}>
               <LayoutDashboard size={14} /> Dashboard
             </button>
-            <button onClick={() => setView("kanban")} className={`flex items-center gap-1 px-2 py-1 rounded transition-colors ${view === "kanban" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
+            <button onClick={() => setView("kanban")} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md transition-all ${view === "kanban" ? "bg-white text-slate-800 shadow-sm font-medium" : "text-slate-500 hover:text-slate-700"}`}>
               <Columns3 size={14} /> Kanban
             </button>
           </div>
@@ -137,7 +153,7 @@ export default function Dashboard({ initialTasks }: Props) {
               <button
                 onClick={() => setExecMode(!execMode)}
                 title={execMode ? "Standard view" : "Executive view"}
-                className="text-xs px-2 py-1.5 rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50 flex items-center gap-1"
+                className="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 flex items-center gap-1"
               >
                 {execMode ? <EyeOff size={14} /> : <Eye size={14} />}
                 {execMode ? "Standard" : "Executive"}
@@ -149,7 +165,7 @@ export default function Dashboard({ initialTasks }: Props) {
             onClick={refresh}
             disabled={loading}
             title="Refresh data"
-            className="text-xs px-2 py-1.5 rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-50"
+            className="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-50 flex items-center gap-1"
           >
             {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
           </button>
@@ -162,22 +178,20 @@ export default function Dashboard({ initialTasks }: Props) {
         <ExecutiveMode tasks={tasks} onSelect={setSidePanelTask} />
       ) : (
         <>
-          {/* KPI Tiles */}
           <KpiTiles tasks={tasks} activeFilter={activeKpi} onFilter={handleKpiFilter} />
 
-          {/* Delivery Health */}
           <DeliveryHealth tasks={tasks} />
 
-          {/* Charts Row */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <StatusDistribution tasks={tasks} onFilter={handleChartFilter} />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <WorkloadChart tasks={tasks} onFilter={handleChartFilter} />
-            <TrendChart tasks={tasks} />
-            <TimelineView tasks={tasks} />
+            <TimelineView tasks={tasks} onSelect={setSidePanelTask} />
           </div>
 
-          {/* Attention Queue */}
-          <AttentionQueue tasks={tasks} onSelect={setSidePanelTask} />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <StatusDistribution tasks={tasks} onFilter={handleChartFilter} />
+            <TrendChart tasks={tasks} />
+            <AttentionQueue tasks={tasks} onSelect={setSidePanelTask} />
+          </div>
         </>
       )}
 
@@ -200,7 +214,6 @@ export default function Dashboard({ initialTasks }: Props) {
         </>
       )}
 
-      {/* Side Panel */}
       <TaskSidePanel task={sidePanelTask} onClose={() => setSidePanelTask(null)} onUpdated={handleUpdated} />
     </div>
   );
