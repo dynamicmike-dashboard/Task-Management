@@ -128,11 +128,16 @@ function SortableCard({
 }
 
 export default function KanbanBoard({ tasks, onSelect, onRefresh }: Props) {
+  const [localTasks, setLocalTasks] = useState<TaskRecord[]>(tasks);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [showNew, setShowNew] = useState(false);
   const [form, setForm] = useState({ taskDescription: "", assignee: "" });
   const [saving, setSaving] = useState(false);
   const [newColumn, setNewColumn] = useState<TaskRecord["progress"]>("Not Started");
+
+  const displayTasks = localTasks.length > 0 || tasks.length > 0 ? (localTasks.length > 0 ? localTasks : tasks) : tasks;
+
+  useEffect(() => { setLocalTasks(tasks); }, [tasks]);
 
   const [cardOrder, setCardOrder] = useState<Record<string, string[]>>(() =>
     loadJson(STORAGE_ORDER_KEY, {})
@@ -151,7 +156,7 @@ export default function KanbanBoard({ tasks, onSelect, onRefresh }: Props) {
   const grouped = useMemo(() => {
     const g: Record<string, TaskRecord[]> = {};
     for (const c of COLUMNS) {
-      const colTasks = tasks.filter((t) => t.progress === c.key);
+      const colTasks = displayTasks.filter((t) => t.progress === c.key);
       const order = cardOrder[c.key] || [];
       const ordered = [...colTasks].sort((a, b) => {
         const ai = order.indexOf(a.id);
@@ -164,7 +169,7 @@ export default function KanbanBoard({ tasks, onSelect, onRefresh }: Props) {
       g[c.key] = ordered;
     }
     return g;
-  }, [tasks, cardOrder]);
+  }, [displayTasks, cardOrder]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -175,16 +180,16 @@ export default function KanbanBoard({ tasks, onSelect, onRefresh }: Props) {
     const { active, over } = event;
     if (!over) return;
     setActiveId(null);
-    const activeTask = tasks.find((t) => t.id === active.id);
+    const activeTask = displayTasks.find((t) => t.id === active.id);
     if (!activeTask) return;
 
     const overId = over.id as string;
-    let targetCol = activeTask.progress;
+    let targetCol: TaskRecord["progress"] = activeTask.progress;
     let targetIdx = -1;
 
     for (const c of COLUMNS) {
       const items = grouped[c.key];
-      if (overId === c.key + "-drop") {
+      if (overId === c.key) {
         targetCol = c.key;
         targetIdx = items.length;
         break;
@@ -197,35 +202,28 @@ export default function KanbanBoard({ tasks, onSelect, onRefresh }: Props) {
       }
     }
 
+    if (targetCol === activeTask.progress && overId === active.id) return;
+
     if (targetCol !== activeTask.progress) {
-      await updateTask(activeTask.id, { progress: targetCol });
+      updateTask(activeTask.id, { progress: targetCol }).catch(() => {});
+      setLocalTasks((prev) =>
+        prev.map((t) =>
+          t.id === activeTask.id ? { ...t, progress: targetCol } : t
+        )
+      );
     }
 
-    if (targetCol === activeTask.progress) {
-      const prev = grouped[targetCol];
-      const oldIdx = prev.findIndex((t) => t.id === active.id);
-      if (oldIdx >= 0 && overId !== active.id) {
-        const moved = arrayMove(prev, oldIdx, targetIdx);
-        setCardOrder((o) => ({ ...o, [targetCol]: moved.map((t) => t.id) }));
-      }
-    } else {
-      const sourceOrder = (cardOrder[activeTask.progress] || []).filter((id) => id !== active.id);
-      const destArr = grouped[targetCol];
-      const insertAt = Math.min(targetIdx, destArr.length);
-      const destItems = [...destArr];
-      destItems.splice(insertAt, 0, activeTask);
-      setCardOrder((o) => ({
-        ...o,
-        [activeTask.progress]: sourceOrder,
-        [targetCol]: destItems.map((t) => t.id),
-      }));
-    }
-
-    onRefresh();
-  }, [tasks, grouped, cardOrder, onRefresh]);
+    setCardOrder((prev) => {
+      const sourceOrder = (prev[activeTask.progress] || []).filter((id) => id !== active.id);
+      const targetArr = (prev[targetCol] || grouped[targetCol].map((t) => t.id)).filter((id) => id !== active.id);
+      targetArr.splice(Math.min(targetIdx, targetArr.length), 0, active.id as string);
+      return { ...prev, [activeTask.progress]: sourceOrder, [targetCol]: targetArr };
+    });
+  }, [displayTasks, grouped]);
 
   const handleQuickMove = async (task: TaskRecord, progress: TaskRecord["progress"]) => {
-    await updateTask(task.id, { progress });
+    updateTask(task.id, { progress }).catch(() => {});
+    setLocalTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, progress } : t)));
     onRefresh();
   };
 
@@ -236,6 +234,7 @@ export default function KanbanBoard({ tasks, onSelect, onRefresh }: Props) {
   const handleDelete = async (task: TaskRecord) => {
     if (!confirm(`Delete "${task.taskDescription}"?`)) return;
     await deleteTaskAction(task.id);
+    setLocalTasks((prev) => prev.filter((t) => t.id !== task.id));
     onRefresh();
   };
 
@@ -249,13 +248,14 @@ export default function KanbanBoard({ tasks, onSelect, onRefresh }: Props) {
     });
     setSaving(false);
     if (res.ok && res.record) {
+      setLocalTasks((prev) => [...prev, res.record!]);
       setForm({ taskDescription: "", assignee: "" });
       setShowNew(false);
       onRefresh();
     }
   };
 
-  const activeTask = activeId ? tasks.find((t) => t.id === activeId) : null;
+  const activeTask = activeId ? displayTasks.find((t) => t.id === activeId) : null;
 
   return (
     <div className="space-y-2">
