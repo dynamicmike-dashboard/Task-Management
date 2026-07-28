@@ -29,7 +29,9 @@ export async function updateTask(
     await updateTaskFields(recordId, fields);
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: String(e) };
+    const msg = String(e);
+    console.error("updateTask error:", msg, "fields:", JSON.stringify(fields));
+    return { ok: false, error: msg };
   }
 }
 
@@ -108,6 +110,8 @@ export async function updateDashboardSettings(
     await teableUpdateSettings(id, fields);
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: String(e) };
+    const msg = String(e);
+    console.error("updateDashboardSettings error:", msg, "fields:", JSON.stringify(fields));
+    return { ok: false, error: msg };
   }
 }

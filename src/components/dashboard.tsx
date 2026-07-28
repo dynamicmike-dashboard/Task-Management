@@ -130,58 +130,60 @@ export default function Dashboard({ initialTasks }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div>
-          <h1 className="text-base font-semibold text-slate-800 flex items-center gap-2">
-            {view === "kanban" ? "Kanban Board" :
-             view === "calendar" ? "Calendar" :
-             view === "archive" ? "Archive" :
-             "Dashboard"}
-            <span className="text-[10px] font-normal text-slate-400 bg-slate-100 rounded-full px-2 py-0.5">
-              {view === "archive" ? `${archived.length} archived` : `${active.length} tasks`}
-            </span>
-          </h1>
-          <p className="text-[10px] text-slate-400 flex items-center gap-1">
-            <Clock size={10} />
-            Updated {lastUpdated.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
-          </p>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="flex bg-slate-100 rounded-lg p-0.5 text-xs overflow-x-auto scrollbar-none snap-x snap-mandatory -mx-2 px-2 sm:mx-0 sm:px-0">
-            <button onClick={() => setView("dashboard")} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md transition-all snap-start shrink-0 ${view === "dashboard" ? "bg-white text-slate-800 shadow-sm font-medium" : "text-slate-500 hover:text-slate-700"}`}>
-              <LayoutDashboard size={14} /> Dash
-            </button>
-            <button onClick={() => setView("kanban")} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md transition-all snap-start shrink-0 ${view === "kanban" ? "bg-white text-slate-800 shadow-sm font-medium" : "text-slate-500 hover:text-slate-700"}`}>
-              <Columns3 size={14} /> Board
-            </button>
-            <button onClick={() => setView("calendar")} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md transition-all snap-start shrink-0 ${view === "calendar" ? "bg-white text-slate-800 shadow-sm font-medium" : "text-slate-500 hover:text-slate-700"}`}>
-              <CalendarDays size={14} /> Calendar
-            </button>
-            <button onClick={() => setView("archive")} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md transition-all snap-start shrink-0 ${view === "archive" ? "bg-white text-slate-800 shadow-sm font-medium" : "text-slate-500 hover:text-slate-700"}`}>
-              <Archive size={14} /> Archive
-            </button>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <h1 className="text-base font-semibold text-slate-800 flex items-center gap-2">
+              {view === "kanban" ? "Kanban Board" :
+               view === "calendar" ? "Calendar" :
+               view === "archive" ? "Archive" :
+               "Dashboard"}
+              <span className="text-[10px] font-normal text-slate-400 bg-slate-100 rounded-full px-2 py-0.5">
+                {view === "archive" ? `${archived.length} archived` : `${active.length} tasks`}
+              </span>
+            </h1>
+            <p className="text-[10px] text-slate-400 flex items-center gap-1">
+              <Clock size={10} />
+              Updated {lastUpdated.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+            </p>
           </div>
-          {view === "dashboard" && (
-            <>
-              <FilterPresets filters={filters} onApply={(f) => setFilters(f)} />
-              <button
-                onClick={() => setExecMode(!execMode)}
-                title={execMode ? "Standard view" : "Executive view"}
-                className="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 flex items-center gap-1"
-              >
-                {execMode ? <EyeOff size={14} /> : <Eye size={14} />}
-                {execMode ? "Standard" : "Executive"}
+          <div className="flex items-center gap-1.5">
+            {view === "dashboard" && (
+              <>
+                <FilterPresets filters={filters} onApply={(f) => setFilters(f)} />
+                <button
+                  onClick={() => setExecMode(!execMode)}
+                  title={execMode ? "Standard view" : "Executive view"}
+                  className="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 flex items-center gap-1"
+                >
+                  {execMode ? <EyeOff size={14} /> : <Eye size={14} />}
+                  {execMode ? "Standard" : "Executive"}
+                </button>
+              </>
+            )}
+            <SettingsDialog />
+            <HelpManual />
+            <CreateTaskDialog onCreated={handleCreated} />
+            {view === "archive" && (
+              <button onClick={refresh} disabled={loading} title="Refresh" className="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-50 flex items-center gap-1">
+                {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
               </button>
-            </>
-          )}
-          <SettingsDialog />
-          <HelpManual />
-          <CreateTaskDialog onCreated={handleCreated} />
-          {view === "archive" && (
-            <button onClick={refresh} disabled={loading} title="Refresh" className="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-50 flex items-center gap-1">
-              {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-            </button>
-          )}
+            )}
+          </div>
+        </div>
+        <div className="flex bg-slate-100 rounded-lg p-0.5 text-xs overflow-x-auto scrollbar-none snap-x snap-mandatory w-full sm:w-auto">
+          <button onClick={() => setView("dashboard")} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md transition-all snap-start shrink-0 ${view === "dashboard" ? "bg-white text-slate-800 shadow-sm font-medium" : "text-slate-500 hover:text-slate-700"}`}>
+            <LayoutDashboard size={14} /> Dash
+          </button>
+          <button onClick={() => setView("kanban")} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md transition-all snap-start shrink-0 ${view === "kanban" ? "bg-white text-slate-800 shadow-sm font-medium" : "text-slate-500 hover:text-slate-700"}`}>
+            <Columns3 size={14} /> Board
+          </button>
+          <button onClick={() => setView("calendar")} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md transition-all snap-start shrink-0 ${view === "calendar" ? "bg-white text-slate-800 shadow-sm font-medium" : "text-slate-500 hover:text-slate-700"}`}>
+            <CalendarDays size={14} /> Calendar
+          </button>
+          <button onClick={() => setView("archive")} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md transition-all snap-start shrink-0 ${view === "archive" ? "bg-white text-slate-800 shadow-sm font-medium" : "text-slate-500 hover:text-slate-700"}`}>
+            <Archive size={14} /> Archive
+          </button>
         </div>
       </div>
 

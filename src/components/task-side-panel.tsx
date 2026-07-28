@@ -47,6 +47,7 @@ export default function TaskSidePanel({ task, onClose, onUpdated }: Props) {
 
   const handleSave = async () => {
     setSaving(true);
+    setFeedback("");
     const res = await updateTask(task.id, form);
     setSaving(false);
     if (res.ok) {

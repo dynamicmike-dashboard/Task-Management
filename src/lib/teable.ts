@@ -26,12 +26,11 @@ const FIELD_MAP: Record<string, keyof TaskRecord> = {
   "Actual Hours": "actualHours",
 };
 
-const FIELD_IDS_CACHE = { ids: {} as Record<string, string>, loaded: false };
+const FIELD_NAME_TO_ID: Record<string, Record<string, string>> = {};
 
-async function loadFieldIds(tableId?: string): Promise<Record<string, string>> {
-  const tid = tableId || TABLE_ID;
-  if (tid === TABLE_ID && FIELD_IDS_CACHE.loaded) return FIELD_IDS_CACHE.ids;
-  const res = await fetch(`${BASE}/api/table/${tid}/field`, {
+async function loadFieldIds(tableId: string): Promise<Record<string, string>> {
+  if (FIELD_NAME_TO_ID[tableId]) return FIELD_NAME_TO_ID[tableId];
+  const res = await fetch(`${BASE}/api/table/${tableId}/field`, {
     headers: { Authorization: `Bearer ${TOKEN}` },
     cache: "no-store",
   });
@@ -41,10 +40,7 @@ async function loadFieldIds(tableId?: string): Promise<Record<string, string>> {
   for (const f of fields) {
     ids[f.name] = f.id;
   }
-  if (tid === TABLE_ID) {
-    FIELD_IDS_CACHE.ids = ids;
-    FIELD_IDS_CACHE.loaded = true;
-  }
+  FIELD_NAME_TO_ID[tableId] = ids;
   return ids;
 }
 
@@ -122,16 +118,38 @@ function toTeableFields(fields: Record<string, unknown>): Record<string, unknown
 }
 
 async function patchRecord(tableId: string, recordId: string, fields: Record<string, unknown>): Promise<void> {
-  const res = await fetch(`${BASE}/api/table/${tableId}/record/${recordId}`, {
+  // Try with field names first
+  let res = await fetch(`${BASE}/api/table/${tableId}/record/${recordId}`, {
     method: "PATCH",
     headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/json" },
     body: JSON.stringify({ fields }),
     cache: "no-store",
   });
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Teable PATCH error ${res.status}: ${text}`);
+  if (res.ok) return;
+  // If names fail, try converting to field IDs
+  const errText = await res.text().catch(() => "");
+  try {
+    const nameToId = await loadFieldIds(tableId);
+    const idFields: Record<string, unknown> = {};
+    for (const [name, val] of Object.entries(fields)) {
+      const id = nameToId[name];
+      if (id) idFields[id] = val;
+    }
+    if (Object.keys(idFields).length > 0) {
+      res = await fetch(`${BASE}/api/table/${tableId}/record/${recordId}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ fields: idFields }),
+        cache: "no-store",
+      });
+      if (res.ok) return;
+      const idErrText = await res.text().catch(() => "");
+      throw new Error(`Teable PATCH error (names then IDs): ${errText} | ${idErrText}`);
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.startsWith("Teable PATCH error")) throw e;
   }
+  throw new Error(`Teable PATCH error: ${errText}`);
 }
 
 async function createRecord(tableId: string, fields: Record<string, unknown>): Promise<TeableRecord> {
@@ -245,6 +263,18 @@ export async function getSettings(): Promise<DashboardSettings | null> {
   };
 }
 
+const SETTINGS_FIELD_MAP: Record<string, string> = {
+  workspaceName: "Workspace Name",
+  clientName: "Client Name",
+  logoUrl: "Logo URL",
+  accentColor: "Accent Color",
+};
+
 export async function updateSettings(id: string, fields: Record<string, unknown>): Promise<void> {
-  await patchRecord(SETTINGS_TABLE_ID, id, fields);
+  const teableFields: Record<string, unknown> = {};
+  for (const [key, val] of Object.entries(fields)) {
+    const teableName = SETTINGS_FIELD_MAP[key];
+    if (teableName) teableFields[teableName] = val;
+  }
+  await patchRecord(SETTINGS_TABLE_ID, id, teableFields);
 }
