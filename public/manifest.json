@@ -1,0 +1,21 @@
+{
+  "name": "Task Operations",
+  "short_name": "TaskOps",
+  "description": "Live operational dashboard and Kanban board for task management",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#0f172a",
+  "orientation": "any",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "business"],
+  "lang": "en-GB"
+}

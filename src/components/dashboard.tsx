@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
-import { RefreshCw, Loader2, Eye, EyeOff } from "lucide-react";
+import { RefreshCw, Loader2, Eye, EyeOff, Columns3, LayoutDashboard } from "lucide-react";
 import { TaskRecord, FilterState } from "@/lib/types";
 import { getTasks } from "@/app/actions/teable";
 import { matchesFilters } from "@/lib/filters";
@@ -18,6 +18,7 @@ import ExecutiveMode from "@/components/executive-mode";
 import CreateTaskDialog from "@/components/create-task-dialog";
 import BulkUpdateDialog from "@/components/bulk-update-dialog";
 import FilterPresets from "@/components/filter-presets";
+import KanbanBoard from "@/components/kanban-board";
 
 interface Props {
   initialTasks: TaskRecord[];
@@ -33,6 +34,7 @@ export default function Dashboard({ initialTasks }: Props) {
     progress: [], assignee: [], important: null, overdue: null, search: "",
   });
 
+  const [view, setView] = useState<"dashboard" | "kanban">("dashboard");
   const [activeKpi, setActiveKpi] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [sidePanelTask, setSidePanelTask] = useState<TaskRecord | null>(null);
@@ -120,16 +122,28 @@ export default function Dashboard({ initialTasks }: Props) {
           <h1 className="text-base font-semibold text-slate-800">Task Operations</h1>
           <p className="text-[10px] text-slate-400">{tasks.length} tasks &middot; Last updated just now</p>
         </div>
-        <div className="flex items-center gap-2">
-          <FilterPresets filters={filters} onApply={(f) => setFilters(f)} />
-          <button
-            onClick={() => setExecMode(!execMode)}
-            title={execMode ? "Standard view" : "Executive view"}
-            className="text-xs px-2 py-1.5 rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50 flex items-center gap-1"
-          >
-            {execMode ? <EyeOff size={14} /> : <Eye size={14} />}
-            {execMode ? "Standard" : "Executive"}
-          </button>
+        <div className="flex items-center gap-1.5">
+          <div className="flex bg-slate-100 rounded-md p-0.5 text-xs mr-1">
+            <button onClick={() => setView("dashboard")} className={`flex items-center gap-1 px-2 py-1 rounded transition-colors ${view === "dashboard" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
+              <LayoutDashboard size={14} /> Dashboard
+            </button>
+            <button onClick={() => setView("kanban")} className={`flex items-center gap-1 px-2 py-1 rounded transition-colors ${view === "kanban" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
+              <Columns3 size={14} /> Kanban
+            </button>
+          </div>
+          {view === "dashboard" && (
+            <>
+              <FilterPresets filters={filters} onApply={(f) => setFilters(f)} />
+              <button
+                onClick={() => setExecMode(!execMode)}
+                title={execMode ? "Standard view" : "Executive view"}
+                className="text-xs px-2 py-1.5 rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50 flex items-center gap-1"
+              >
+                {execMode ? <EyeOff size={14} /> : <Eye size={14} />}
+                {execMode ? "Standard" : "Executive"}
+              </button>
+            </>
+          )}
           <CreateTaskDialog onCreated={handleCreated} />
           <button
             onClick={refresh}
@@ -142,7 +156,9 @@ export default function Dashboard({ initialTasks }: Props) {
         </div>
       </div>
 
-      {execMode ? (
+      {view === "kanban" ? (
+        <KanbanBoard tasks={tasks} onSelect={setSidePanelTask} onRefresh={refresh} />
+      ) : execMode ? (
         <ExecutiveMode tasks={tasks} onSelect={setSidePanelTask} />
       ) : (
         <>
@@ -165,23 +181,24 @@ export default function Dashboard({ initialTasks }: Props) {
         </>
       )}
 
-      {/* Bulk Update */}
-      <BulkUpdateDialog
-        selected={selected}
-        tasks={tasks}
-        onDone={refresh}
-        onClear={() => setSelected(new Set())}
-      />
-
-      {/* Task Table */}
-      <TaskTable
-        tasks={tasks}
-        filters={filters}
-        onFilters={setFilters}
-        selected={selected}
-        onToggleSelect={toggleSelect}
-        onSelect={setSidePanelTask}
-      />
+      {view === "dashboard" && (
+        <>
+          <BulkUpdateDialog
+            selected={selected}
+            tasks={tasks}
+            onDone={refresh}
+            onClear={() => setSelected(new Set())}
+          />
+          <TaskTable
+            tasks={tasks}
+            filters={filters}
+            onFilters={setFilters}
+            selected={selected}
+            onToggleSelect={toggleSelect}
+            onSelect={setSidePanelTask}
+          />
+        </>
+      )}
 
       {/* Side Panel */}
       <TaskSidePanel task={sidePanelTask} onClose={() => setSidePanelTask(null)} onUpdated={handleUpdated} />
