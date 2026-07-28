@@ -118,16 +118,16 @@ function toTeableFields(fields: Record<string, unknown>): Record<string, unknown
 }
 
 async function patchRecord(tableId: string, recordId: string, fields: Record<string, unknown>): Promise<void> {
-  // Try with field names first
+  const body = JSON.stringify({ record: { fields } });
   let res = await fetch(`${BASE}/api/table/${tableId}/record/${recordId}`, {
     method: "PATCH",
     headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ fields }),
+    body,
     cache: "no-store",
   });
   if (res.ok) return;
-  // If names fail, try converting to field IDs
   const errText = await res.text().catch(() => "");
+  // If names fail, try converting to field IDs
   try {
     const nameToId = await loadFieldIds(tableId);
     const idFields: Record<string, unknown> = {};
@@ -139,7 +139,7 @@ async function patchRecord(tableId: string, recordId: string, fields: Record<str
       res = await fetch(`${BASE}/api/table/${tableId}/record/${recordId}`, {
         method: "PATCH",
         headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ fields: idFields }),
+        body: JSON.stringify({ record: { fields: idFields } }),
         cache: "no-store",
       });
       if (res.ok) return;
