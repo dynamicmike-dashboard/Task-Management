@@ -147,17 +147,17 @@ export default function Dashboard({ initialTasks }: Props) {
           </p>
         </div>
         <div className="flex items-center gap-1.5">
-          <div className="flex bg-slate-100 rounded-lg p-0.5 text-xs">
-            <button onClick={() => setView("dashboard")} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md transition-all ${view === "dashboard" ? "bg-white text-slate-800 shadow-sm font-medium" : "text-slate-500 hover:text-slate-700"}`}>
+          <div className="flex bg-slate-100 rounded-lg p-0.5 text-xs overflow-x-auto scrollbar-none snap-x snap-mandatory -mx-2 px-2 sm:mx-0 sm:px-0">
+            <button onClick={() => setView("dashboard")} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md transition-all snap-start shrink-0 ${view === "dashboard" ? "bg-white text-slate-800 shadow-sm font-medium" : "text-slate-500 hover:text-slate-700"}`}>
               <LayoutDashboard size={14} /> Dash
             </button>
-            <button onClick={() => setView("kanban")} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md transition-all ${view === "kanban" ? "bg-white text-slate-800 shadow-sm font-medium" : "text-slate-500 hover:text-slate-700"}`}>
+            <button onClick={() => setView("kanban")} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md transition-all snap-start shrink-0 ${view === "kanban" ? "bg-white text-slate-800 shadow-sm font-medium" : "text-slate-500 hover:text-slate-700"}`}>
               <Columns3 size={14} /> Board
             </button>
-            <button onClick={() => setView("calendar")} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md transition-all ${view === "calendar" ? "bg-white text-slate-800 shadow-sm font-medium" : "text-slate-500 hover:text-slate-700"}`}>
+            <button onClick={() => setView("calendar")} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md transition-all snap-start shrink-0 ${view === "calendar" ? "bg-white text-slate-800 shadow-sm font-medium" : "text-slate-500 hover:text-slate-700"}`}>
               <CalendarDays size={14} /> Calendar
             </button>
-            <button onClick={() => setView("archive")} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md transition-all ${view === "archive" ? "bg-white text-slate-800 shadow-sm font-medium" : "text-slate-500 hover:text-slate-700"}`}>
+            <button onClick={() => setView("archive")} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md transition-all snap-start shrink-0 ${view === "archive" ? "bg-white text-slate-800 shadow-sm font-medium" : "text-slate-500 hover:text-slate-700"}`}>
               <Archive size={14} /> Archive
             </button>
           </div>

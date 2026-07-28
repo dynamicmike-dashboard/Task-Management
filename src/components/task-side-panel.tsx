@@ -55,7 +55,7 @@ export default function TaskSidePanel({ task, onClose, onUpdated }: Props) {
       setForm({});
       setTimeout(() => { setFeedback(""); onUpdated(); }, 1500);
     } else {
-      setFeedback("Error saving");
+      setFeedback(res.error || "Error saving");
     }
   };
 

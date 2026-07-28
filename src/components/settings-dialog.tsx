@@ -39,7 +39,7 @@ export default function SettingsDialog() {
       setFeedback("Saved");
       setTimeout(() => setFeedback(""), 2000);
     } else {
-      setFeedback("Error saving");
+      setFeedback(res.error || "Error saving");
     }
   };
 

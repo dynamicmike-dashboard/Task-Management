@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { ChevronLeft, ChevronRight, Circle, Clock, CheckCircle2, AlertCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, Circle, Clock, CheckCircle2, AlertCircle, Plus } from "lucide-react";
 import { TaskRecord } from "@/lib/types";
 
 interface Props {
@@ -18,13 +18,19 @@ export default function CalendarView({ tasks, onSelect }: Props) {
   const month = date.getMonth();
 
   const withDates = useMemo(
-    () => tasks.filter((t) => t.expectedCompletionDate && !t.archived),
+    () => tasks.filter((t) => t.expectedCompletionDate),
+    [tasks]
+  );
+
+  const withoutDates = useMemo(
+    () => tasks.filter((t) => !t.expectedCompletionDate),
     [tasks]
   );
 
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
 
   const prev = () => setDate(new Date(year, month - 1, 1));
   const next = () => setDate(new Date(year, month + 1, 1));
@@ -38,8 +44,6 @@ export default function CalendarView({ tasks, onSelect }: Props) {
   for (let d = 1; d <= daysInMonth; d++) {
     cells.push({ day: d, tasks: getTasksForDay(d) });
   }
-
-  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
 
   return (
     <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
@@ -97,6 +101,44 @@ export default function CalendarView({ tasks, onSelect }: Props) {
             </div>
           );
         })}
+      </div>
+
+      <div className="px-4 py-3 border-t border-slate-100 text-[11px] text-slate-500 space-y-2">
+        <div className="flex items-center justify-between">
+          <span>{withDates.length} tasks with dates &middot; {withoutDates.length} without</span>
+        </div>
+        {withoutDates.length > 0 && (
+          <div>
+            <details className="group">
+              <summary className="text-[10px] font-medium text-slate-400 cursor-pointer hover:text-slate-600">
+                Tasks without dates ({withoutDates.length})
+              </summary>
+              <div className="mt-1 space-y-0.5 max-h-24 overflow-y-auto">
+                {withoutDates.slice(0, 10).map((t) => (
+                  <button key={t.id} onClick={() => onSelect(t)} className="w-full text-left flex items-center gap-1.5 px-2 py-0.5 rounded hover:bg-slate-50 text-[10px]">
+                    <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                      t.progress === "Completed" ? "bg-emerald-400" :
+                      t.progress === "In Progress" ? "bg-blue-400" :
+                      "bg-slate-300"
+                    }`} />
+                    <span className="truncate text-slate-600">{t.taskDescription}</span>
+                    <span className="text-slate-300 ml-auto">{t.assignee}</span>
+                  </button>
+                ))}
+                {withoutDates.length > 10 && (
+                  <span className="text-[9px] text-slate-400 pl-2">+{withoutDates.length - 10} more</span>
+                )}
+              </div>
+            </details>
+          </div>
+        )}
+        {tasks.length > 0 && withDates.length === 0 && (
+          <div className="text-center py-4">
+            <AlertCircle size={20} className="mx-auto text-slate-300 mb-1" />
+            <p className="text-xs text-slate-400">No tasks have due dates set.</p>
+            <p className="text-[10px] text-slate-300 mt-0.5">Open a task in the side panel and set an Expected Completion Date to see it here.</p>
+          </div>
+        )}
       </div>
     </div>
   );

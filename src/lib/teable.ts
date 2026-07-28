@@ -122,15 +122,10 @@ function toTeableFields(fields: Record<string, unknown>): Record<string, unknown
 }
 
 async function patchRecord(tableId: string, recordId: string, fields: Record<string, unknown>): Promise<void> {
-  const fieldIds = await loadFieldIds(tableId);
-  const body: Record<string, unknown> = {};
-  for (const [name, val] of Object.entries(fields)) {
-    body[fieldIds[name] || name] = val;
-  }
   const res = await fetch(`${BASE}/api/table/${tableId}/record/${recordId}`, {
     method: "PATCH",
     headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ fields: body }),
+    body: JSON.stringify({ fields }),
     cache: "no-store",
   });
   if (!res.ok) {
