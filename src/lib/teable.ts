@@ -140,11 +140,12 @@ export async function updateTaskFields(
       (k) => FIELD_MAP[k] === key
     );
     if (teableFieldName) {
-      teableFields[teableFieldName] = val;
+      const fieldId = fieldIds[teableFieldName];
+      teableFields[fieldId || teableFieldName] = val;
     }
   }
 
-  await fetch(`${BASE}/api/table/${TABLE_ID}/record/${recordId}`, {
+  const res = await fetch(`${BASE}/api/table/${TABLE_ID}/record/${recordId}`, {
     method: "PATCH",
     headers: {
       Authorization: `Bearer ${TOKEN}`,
@@ -153,6 +154,10 @@ export async function updateTaskFields(
     body: JSON.stringify({ fields: teableFields }),
     cache: "no-store",
   });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Teable update error ${res.status}: ${body}`);
+  }
 }
 
 export async function createTask(
