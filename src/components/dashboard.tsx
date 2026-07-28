@@ -43,6 +43,7 @@ export default function Dashboard({ initialTasks }: Props) {
   const [activeKpi, setActiveKpi] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [sidePanelTask, setSidePanelTask] = useState<TaskRecord | null>(null);
+  const [newTaskDate, setNewTaskDate] = useState<string | null>(null);
 
   const active = tasks.filter((t) => !t.archived);
   const archived = tasks.filter((t) => t.archived);
@@ -163,7 +164,7 @@ export default function Dashboard({ initialTasks }: Props) {
             )}
             <SettingsDialog />
             <HelpManual />
-            <CreateTaskDialog onCreated={handleCreated} />
+            <CreateTaskDialog onCreated={handleCreated} initialDate={newTaskDate} onOpenChange={(open) => { if (!open) setNewTaskDate(null); }} />
             {view === "archive" && (
               <button onClick={refresh} disabled={loading} title="Refresh" className="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-50 flex items-center gap-1">
                 {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
@@ -190,7 +191,7 @@ export default function Dashboard({ initialTasks }: Props) {
       {view === "kanban" ? (
         <KanbanBoard tasks={active} onSelect={setSidePanelTask} onRefresh={refresh} />
       ) : view === "calendar" ? (
-        <CalendarView tasks={active} onSelect={setSidePanelTask} />
+        <CalendarView tasks={active} onSelect={setSidePanelTask} onAddTask={(date) => setNewTaskDate(date)} />
       ) : view === "archive" ? (
         <ArchiveView tasks={tasks} onRefresh={refresh} onSelect={setSidePanelTask} />
       ) : execMode ? (

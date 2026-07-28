@@ -1,15 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, X } from "lucide-react";
 import { createTaskAction } from "@/app/actions/teable";
 import { TaskRecord } from "@/lib/types";
 
 interface Props {
   onCreated: (task: TaskRecord) => void;
+  initialDate?: string | null;
+  onOpenChange?: (open: boolean) => void;
 }
 
-export default function CreateTaskDialog({ onCreated }: Props) {
+export default function CreateTaskDialog({ onCreated, initialDate, onOpenChange }: Props) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -17,33 +19,56 @@ export default function CreateTaskDialog({ onCreated }: Props) {
     taskDescription: "",
     taskSummary: "",
     assignee: "",
+    expectedCompletionDate: "",
   });
 
   const handleSave = async () => {
     if (!form.taskDescription.trim()) return;
     setError("");
     setSaving(true);
-    const res = await createTaskAction({
+    const fields: Record<string, unknown> = {
       taskDescription: form.taskDescription,
       taskSummary: form.taskSummary,
       assignee: form.assignee,
       progress: "Not Started",
-    });
+    };
+    if (form.expectedCompletionDate) {
+      fields.expectedCompletionDate = form.expectedCompletionDate;
+    }
+    const res = await createTaskAction(fields);
     setSaving(false);
     if (res.ok && res.record) {
       onCreated(res.record);
       setOpen(false);
       setError("");
-      setForm({ taskDescription: "", taskSummary: "", assignee: "" });
+      setForm({ taskDescription: "", taskSummary: "", assignee: "", expectedCompletionDate: "" });
+      onOpenChange?.(false);
     } else {
       setError(res.error || "Failed to create task. Check console for details.");
     }
   };
 
+  useEffect(() => {
+    if (initialDate) {
+      setForm((f) => ({ ...f, expectedCompletionDate: initialDate }));
+      setOpenWrapped(true);
+    }
+  }, [initialDate]);
+
+  const setOpenWrapped = (v: boolean) => {
+    setOpen(v);
+    onOpenChange?.(v);
+  };
+
   const handleOpen = () => {
     setError("");
-    setOpen(true);
+    if (initialDate) {
+      setForm((f) => ({ ...f, expectedCompletionDate: initialDate }));
+    }
+    setOpenWrapped(true);
   };
+
+  const handleClose = () => setOpenWrapped(false);
 
   return (
     <>
@@ -60,7 +85,7 @@ export default function CreateTaskDialog({ onCreated }: Props) {
           <div className="bg-white rounded-lg shadow-xl border border-slate-200 w-full max-w-lg mx-2">
             <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
               <h2 className="text-sm font-semibold text-slate-800">Create Task</h2>
-              <button onClick={() => setOpen(false)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={handleClose} className="text-slate-400 hover:text-slate-600">
                 <X size={16} />
               </button>
             </div>
@@ -69,9 +94,10 @@ export default function CreateTaskDialog({ onCreated }: Props) {
               <Input label="Task Description *" value={form.taskDescription} onChange={(v) => setForm({ ...form, taskDescription: v })} />
               <Input label="Task Summary" value={form.taskSummary} onChange={(v) => setForm({ ...form, taskSummary: v })} />
               <Input label="Assignee" value={form.assignee} onChange={(v) => setForm({ ...form, assignee: v })} />
+              <Input label="Due Date" value={form.expectedCompletionDate} onChange={(v) => setForm({ ...form, expectedCompletionDate: v })} type="date" />
             </div>
             <div className="flex justify-end gap-2 px-4 py-3 border-t border-slate-100">
-              <button onClick={() => setOpen(false)} className="text-xs px-3 py-1.5 rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50">Cancel</button>
+              <button onClick={handleClose} className="text-xs px-3 py-1.5 rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50">Cancel</button>
               <button onClick={handleSave} disabled={saving || !form.taskDescription.trim()} className="text-xs px-3 py-1.5 rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">
                 {saving ? "Saving..." : "Create"}
               </button>

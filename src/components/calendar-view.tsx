@@ -1,18 +1,19 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { ChevronLeft, ChevronRight, Circle, Clock, CheckCircle2, AlertCircle, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Circle, Clock, CheckCircle2, AlertCircle, Plus as PlusIcon } from "lucide-react";
 import { TaskRecord } from "@/lib/types";
 
 interface Props {
   tasks: TaskRecord[];
   onSelect: (task: TaskRecord) => void;
+  onAddTask?: (date: string) => void;
 }
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-export default function CalendarView({ tasks, onSelect }: Props) {
+export default function CalendarView({ tasks, onSelect, onAddTask }: Props) {
   const [date, setDate] = useState(new Date());
   const year = date.getFullYear();
   const month = date.getMonth();
@@ -45,6 +46,11 @@ export default function CalendarView({ tasks, onSelect }: Props) {
     cells.push({ day: d, tasks: getTasksForDay(d) });
   }
 
+  const handleDayClick = (day: number) => {
+    const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    onAddTask?.(dateStr);
+  };
+
   return (
     <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
@@ -74,7 +80,11 @@ export default function CalendarView({ tasks, onSelect }: Props) {
           const isToday = dateStr === todayStr;
           return (
             <div key={day} className={`min-h-[80px] p-1 border-b border-r border-slate-50 ${isToday ? "bg-blue-50/50" : ""}`}>
-              <div className={`text-[10px] font-medium mb-0.5 w-5 h-5 flex items-center justify-center rounded-full ${isToday ? "bg-blue-600 text-white" : "text-slate-500"}`}>
+              <div
+                onClick={() => handleDayClick(day)}
+                className={`text-[10px] font-medium mb-0.5 w-5 h-5 flex items-center justify-center rounded-full cursor-pointer hover:ring-2 hover:ring-blue-300 transition-all ${isToday ? "bg-blue-600 text-white" : "text-slate-500"}`}
+                title="Add task on this day"
+              >
                 {day}
               </div>
               <div className="space-y-0.5">
@@ -136,9 +146,17 @@ export default function CalendarView({ tasks, onSelect }: Props) {
           <div className="text-center py-4">
             <AlertCircle size={20} className="mx-auto text-slate-300 mb-1" />
             <p className="text-xs text-slate-400">No tasks have due dates set.</p>
-            <p className="text-[10px] text-slate-300 mt-0.5">Open a task in the side panel and set an Expected Completion Date to see it here.</p>
+            <p className="text-[10px] text-slate-300 mt-0.5">Click a day number above to create a task with that date.</p>
           </div>
         )}
+        <div className="flex justify-center pt-1">
+          <button
+            onClick={() => onAddTask?.("")}
+            className="flex items-center gap-1 text-[10px] text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded px-2 py-1 transition-colors"
+          >
+            <PlusIcon size={12} /> Add task without date
+          </button>
+        </div>
       </div>
     </div>
   );
