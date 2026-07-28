@@ -1,21 +1,29 @@
 {
-  "name": "Task Operations",
+  "name": "Task Operations Dashboard",
   "short_name": "TaskOps",
-  "description": "Live operational dashboard and Kanban board for task management",
+  "description": "Live operational dashboard, Kanban board, calendar, and archive for task management powered by Teable",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f8fafc",
   "theme_color": "#0f172a",
   "orientation": "any",
   "scope": "/",
+  "lang": "en-GB",
+  "categories": ["productivity", "business", "project-management"],
   "icons": [
     {
       "src": "/icons/icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
     }
   ],
-  "categories": ["productivity", "business"],
-  "lang": "en-GB"
+  "screenshots": [],
+  "prefer_related_applications": false
 }

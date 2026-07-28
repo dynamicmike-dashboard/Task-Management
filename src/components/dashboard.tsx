@@ -22,6 +22,7 @@ import KanbanBoard from "@/components/kanban-board";
 import CalendarView from "@/components/calendar-view";
 import ArchiveView from "@/components/archive-view";
 import SettingsDialog from "@/components/settings-dialog";
+import HelpManual from "@/components/help-manual";
 
 interface Props {
   initialTasks: TaskRecord[];
@@ -174,6 +175,7 @@ export default function Dashboard({ initialTasks }: Props) {
             </>
           )}
           <SettingsDialog />
+          <HelpManual />
           <CreateTaskDialog onCreated={handleCreated} />
           {view === "archive" && (
             <button onClick={refresh} disabled={loading} title="Refresh" className="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-50 flex items-center gap-1">
