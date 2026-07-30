@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { ArrowUpDown, ArrowUp, ArrowDown, Search, Star, Trash2, Circle, Clock, CheckCircle2, AlertTriangle, Archive } from "lucide-react";
 import { TaskRecord, Progress, FilterState, Priority, Project } from "@/lib/types";
 import { isOverdue, matchesFilters } from "@/lib/filters";
@@ -60,8 +60,18 @@ export default function TaskTable({ tasks, filters, onFilters, selected, onToggl
   const [savingId, setSavingId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
+  const [projectOverrides, setProjectOverrides] = useState<Record<string, string>>({});
 
   const assignees = useMemo(() => [...new Set(tasks.map((t) => t.assignee).filter(Boolean))].sort(), [tasks]);
+
+  // Clear project overrides when tasks refresh from parent
+  const taskIds = useMemo(() => new Set(tasks.map((t) => t.id)), [tasks]);
+  useEffect(() => {
+    setProjectOverrides((o) => {
+      const stale = Object.keys(o).filter((id) => !taskIds.has(id));
+      return stale.length > 0 ? Object.fromEntries(Object.entries(o).filter(([k]) => taskIds.has(k))) : o;
+    });
+  }, [taskIds]);
 
   const filtered = useMemo(
     () => tasks.filter((t) => matchesFilters(t, filters)),
@@ -362,9 +372,10 @@ export default function TaskTable({ tasks, filters, onFilters, selected, onToggl
                   <td className="px-2 py-2" onClick={(e) => e.stopPropagation()}>
                     {projects.length > 0 ? (
                       <select
-                        value={task.project || ""}
+                        value={projectOverrides[task.id] ?? task.project ?? ""}
                         onChange={async (e) => {
                           const val = e.target.value;
+                          setProjectOverrides((o) => ({ ...o, [task.id]: val }));
                           setSavingId(task.id);
                           await updateTask(task.id, { project: val || null });
                           setSavingId(null);
