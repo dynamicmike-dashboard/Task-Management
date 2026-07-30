@@ -21,6 +21,7 @@ export interface TaskRecord {
   percentComplete: number;
   estimatedHours: number;
   actualHours: number;
+  project: string;
 }
 
 export interface ActivityRecord {
@@ -56,6 +57,14 @@ export interface FilterState {
   search: string;
   blocked: boolean | null;
   priority: Priority[];
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  color: string;
+  parentId: string | null;
+  sortOrder: number;
 }
 
 export interface FilterPreset {

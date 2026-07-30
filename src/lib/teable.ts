@@ -1,4 +1,4 @@
-import { TaskRecord, ActivityRecord, DashboardSettings, TeableRecord, TeableField } from "./types";
+import { TaskRecord, ActivityRecord, DashboardSettings, TeableRecord, TeableField, Project } from "./types";
 
 const BASE = process.env.TEABLE_BASE_URL || "https://teable.maistermind.com";
 const TOKEN = process.env.TEABLE_API_KEY || "";
@@ -24,6 +24,7 @@ const FIELD_MAP: Record<string, keyof TaskRecord> = {
   "Percent Complete": "percentComplete",
   "Estimated Hours": "estimatedHours",
   "Actual Hours": "actualHours",
+  "Project": "project",
 };
 
 const FIELD_NAME_TO_ID: Record<string, Record<string, string>> = {};
@@ -105,6 +106,7 @@ function parseRecord(r: TeableRecord): TaskRecord {
     percentComplete: Math.min(100, Math.max(0, getNum(f["Percent Complete"]))),
     estimatedHours: Math.max(0, getNum(f["Estimated Hours"])),
     actualHours: Math.max(0, getNum(f["Actual Hours"])),
+    project: getStr(f["Project"]),
   };
 }
 
@@ -276,5 +278,41 @@ export async function updateSettings(id: string, fields: Record<string, unknown>
     const teableName = SETTINGS_FIELD_MAP[key];
     if (teableName) teableFields[teableName] = val;
   }
+  // Also pass through custom fields not in SETTINGS_FIELD_MAP (e.g. Projects Config)
+  for (const [key, val] of Object.entries(fields)) {
+    if (!SETTINGS_FIELD_MAP[key]) {
+      teableFields[key] = val;
+    }
+  }
   await patchRecord(SETTINGS_TABLE_ID, id, teableFields);
+}
+
+// --- Projects API ---
+// Projects config is stored as a JSON string in the Settings table field "Projects Config"
+
+export async function getProjectsConfig(): Promise<Project[]> {
+  try {
+    const settings = await getSettings();
+    if (!settings) return [];
+    // Load projects from Settings record (we'll fetch the raw record)
+    const url = `${BASE}/api/table/${SETTINGS_TABLE_ID}/record/${settings.id}`;
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${TOKEN}` },
+      cache: "no-store",
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    const raw = data.fields?.["Projects Config"];
+    if (!raw) return [];
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function saveProjectsConfig(settingsId: string, projects: Project[]): Promise<void> {
+  await patchRecord(SETTINGS_TABLE_ID, settingsId, {
+    "Projects Config": JSON.stringify(projects),
+  });
 }

@@ -3,15 +3,29 @@
 import { useState, useEffect } from "react";
 import { Plus, X } from "lucide-react";
 import { createTaskAction } from "@/app/actions/teable";
-import { TaskRecord } from "@/lib/types";
+import { TaskRecord, Project } from "@/lib/types";
 
 interface Props {
   onCreated: (task: TaskRecord) => void;
   initialDate?: string | null;
   onOpenChange?: (open: boolean) => void;
+  projects?: Project[];
+  selectedProject?: string | null;
 }
 
-export default function CreateTaskDialog({ onCreated, initialDate, onOpenChange }: Props) {
+function getFullPath(projectId: string, projects: Project[]): string {
+  const parts: string[] = [];
+  let id: string | null = projectId;
+  while (id) {
+    const p = projects.find((pr) => pr.id === id);
+    if (!p) break;
+    parts.unshift(p.name);
+    id = p.parentId;
+  }
+  return parts.join(" > ");
+}
+
+export default function CreateTaskDialog({ onCreated, initialDate, onOpenChange, projects = [], selectedProject }: Props) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -20,6 +34,7 @@ export default function CreateTaskDialog({ onCreated, initialDate, onOpenChange 
     taskSummary: "",
     assignee: "",
     expectedCompletionDate: "",
+    project: "",
   });
 
   const handleSave = async () => {
@@ -35,13 +50,16 @@ export default function CreateTaskDialog({ onCreated, initialDate, onOpenChange 
     if (form.expectedCompletionDate) {
       fields.expectedCompletionDate = form.expectedCompletionDate;
     }
+    if (form.project) {
+      fields.project = form.project;
+    }
     const res = await createTaskAction(fields);
     setSaving(false);
     if (res.ok && res.record) {
       onCreated(res.record);
       setOpen(false);
       setError("");
-      setForm({ taskDescription: "", taskSummary: "", assignee: "", expectedCompletionDate: "" });
+      setForm({ taskDescription: "", taskSummary: "", assignee: "", expectedCompletionDate: "", project: "" });
       onOpenChange?.(false);
     } else {
       setError(res.error || "Failed to create task. Check console for details.");
@@ -62,9 +80,10 @@ export default function CreateTaskDialog({ onCreated, initialDate, onOpenChange 
 
   const handleOpen = () => {
     setError("");
-    if (initialDate) {
-      setForm((f) => ({ ...f, expectedCompletionDate: initialDate }));
-    }
+    const prefill: Record<string, string> = {};
+    if (initialDate) prefill.expectedCompletionDate = initialDate;
+    if (selectedProject) prefill.project = selectedProject;
+    setForm((f) => ({ ...f, ...prefill }));
     setOpenWrapped(true);
   };
 
@@ -95,6 +114,23 @@ export default function CreateTaskDialog({ onCreated, initialDate, onOpenChange 
               <Input label="Task Summary" value={form.taskSummary} onChange={(v) => setForm({ ...form, taskSummary: v })} />
               <Input label="Assignee" value={form.assignee} onChange={(v) => setForm({ ...form, assignee: v })} />
               <Input label="Due Date" value={form.expectedCompletionDate} onChange={(v) => setForm({ ...form, expectedCompletionDate: v })} type="date" />
+              {projects.length > 0 && (
+                <div>
+                  <label className="text-xs font-medium text-slate-500 mb-0.5 block">Project</label>
+                  <select
+                    value={form.project}
+                    onChange={(e) => setForm({ ...form, project: e.target.value })}
+                    className="w-full text-xs border border-slate-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white"
+                  >
+                    <option value="">No project</option>
+                    {projects.sort((a, b) => a.sortOrder - b.sortOrder).map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {getFullPath(p.id, projects)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
             <div className="flex justify-end gap-2 px-4 py-3 border-t border-slate-100">
               <button onClick={handleClose} className="text-xs px-3 py-1.5 rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50">Cancel</button>

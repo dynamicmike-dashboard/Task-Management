@@ -9,8 +9,10 @@ import {
   getActivity,
   getSettings,
   updateSettings as teableUpdateSettings,
+  getProjectsConfig as teableGetProjects,
+  saveProjectsConfig as teableSaveProjects,
 } from "@/lib/teable";
-import { TaskRecord, DashboardSettings } from "@/lib/types";
+import { TaskRecord, DashboardSettings, Project } from "@/lib/types";
 
 export async function getTasks(): Promise<{ tasks: TaskRecord[]; error?: string }> {
   try {
@@ -113,5 +115,27 @@ export async function updateDashboardSettings(
     const msg = String(e);
     console.error("updateDashboardSettings error:", msg, "fields:", JSON.stringify(fields));
     return { ok: false, error: msg };
+  }
+}
+
+export async function getProjects(): Promise<{ projects: Project[]; error?: string }> {
+  try {
+    const projects = await teableGetProjects();
+    return { projects };
+  } catch (e) {
+    return { projects: [], error: String(e) };
+  }
+}
+
+export async function saveProjects(
+  projects: Project[]
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const settings = await getSettings();
+    if (!settings) return { ok: false, error: "No settings record found" };
+    await teableSaveProjects(settings.id, projects);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: String(e) };
   }
 }

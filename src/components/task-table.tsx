@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { ArrowUpDown, ArrowUp, ArrowDown, Search, Star, Trash2, Circle, Clock, CheckCircle2, AlertTriangle, Archive } from "lucide-react";
-import { TaskRecord, Progress, FilterState, Priority } from "@/lib/types";
+import { TaskRecord, Progress, FilterState, Priority, Project } from "@/lib/types";
 import { isOverdue, matchesFilters } from "@/lib/filters";
 import { computeRisk } from "@/lib/risk";
 import { updateTask, archiveTask } from "@/app/actions/teable";
@@ -14,9 +14,22 @@ interface Props {
   selected: Set<string>;
   onToggleSelect: (id: string) => void;
   onSelect: (task: TaskRecord) => void;
+  projects?: Project[];
 }
 
-type SortKey = keyof Pick<TaskRecord, "taskDescription" | "assignee" | "progress" | "expectedCompletionDate" | "startDate">;
+function getFullPath(projectId: string, projects: Project[]): string {
+  const parts: string[] = [];
+  let id: string | null = projectId;
+  while (id) {
+    const p = projects.find((pr) => pr.id === id);
+    if (!p) break;
+    parts.unshift(p.name);
+    id = p.parentId;
+  }
+  return parts.join(" > ");
+}
+
+type SortKey = keyof Pick<TaskRecord, "taskDescription" | "assignee" | "progress" | "expectedCompletionDate" | "startDate" | "project">;
 
 const SORT_LABELS: Record<SortKey, string> = {
   taskDescription: "Task",
@@ -24,11 +37,12 @@ const SORT_LABELS: Record<SortKey, string> = {
   progress: "Status",
   expectedCompletionDate: "Due",
   startDate: "Start",
+  project: "Project",
 };
 
 const PROGRESS_ORDER: Record<Progress, number> = { Completed: 0, "In Progress": 1, "Not Started": 2 };
 
-export default function TaskTable({ tasks, filters, onFilters, selected, onToggleSelect, onSelect }: Props) {
+export default function TaskTable({ tasks, filters, onFilters, selected, onToggleSelect, onSelect, projects = [] }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>("expectedCompletionDate");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -228,6 +242,14 @@ export default function TaskTable({ tasks, filters, onFilters, selected, onToggl
                   ) : <ArrowUpDown size={11} className="opacity-30" />}
                 </div>
               </th>
+              <th className="px-2 py-2 text-left font-medium text-slate-400 cursor-pointer hover:text-slate-600 w-[13%]" onClick={() => toggleSort("project")}>
+                <div className="flex items-center gap-1">
+                  Project
+                  {sortKey === "project" ? (
+                    sortDir === "asc" ? <ArrowUp size={11} /> : <ArrowDown size={11} />
+                  ) : <ArrowUpDown size={11} className="opacity-30" />}
+                </div>
+              </th>
               <th className="px-2 py-2 text-left font-medium text-slate-400 cursor-pointer hover:text-slate-600 w-[12%]" onClick={() => toggleSort("progress")}>
                 <div className="flex items-center gap-1">
                   Status
@@ -324,6 +346,18 @@ export default function TaskTable({ tasks, filters, onFilters, selected, onToggl
                   </td>
                   <td className="px-2 py-2 text-slate-600" onClick={() => onSelect(task)}>
                     {task.assignee || <span className="text-slate-300">—</span>}
+                  </td>
+                  <td className="px-2 py-2" onClick={() => onSelect(task)}>
+                    {task.project && projects && projects.length > 0 ? (
+                      <span className="flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: projects.find((p) => p.id === task.project)?.color || "#94a3b8" }} />
+                        <span className="text-[10px] text-slate-500 truncate max-w-[100px]">
+                          {getFullPath(task.project, projects)}
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="text-slate-300">—</span>
+                    )}
                   </td>
                   <td className="px-2 py-2" onClick={() => onSelect(task)}>
                     <div className="flex items-center gap-1">

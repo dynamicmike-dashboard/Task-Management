@@ -10,7 +10,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Plus, X, MoreHorizontal, GripVertical, Check, Trash2, Edit3 } from "lucide-react";
-import { TaskRecord } from "@/lib/types";
+import { TaskRecord, Project } from "@/lib/types";
 import { updateTask, archiveTask, createTaskAction } from "@/app/actions/teable";
 import { isOverdue } from "@/lib/filters";
 
@@ -44,6 +44,20 @@ interface Props {
   tasks: TaskRecord[];
   onSelect: (task: TaskRecord) => void;
   onRefresh: () => void;
+  projects?: Project[];
+  selectedProject?: string | null;
+}
+
+function getProjectPath(projectId: string, projects: Project[]): string {
+  const parts: string[] = [];
+  let id: string | null = projectId;
+  while (id) {
+    const p = projects.find((pr) => pr.id === id);
+    if (!p) break;
+    parts.unshift(p.name);
+    id = p.parentId;
+  }
+  return parts.join(" > ");
 }
 
 function loadJson<T>(key: string, fallback: T): T {
@@ -55,9 +69,9 @@ function loadJson<T>(key: string, fallback: T): T {
 }
 
 function SortableCard({
-  task, color, labels, onSelect, onDelete, onColorChange, onQuickMove,
+  task, color, labels, projects, onSelect, onDelete, onColorChange, onQuickMove,
 }: {
-  task: TaskRecord; color: string; labels: KanbanLabel[];
+  task: TaskRecord; color: string; labels: KanbanLabel[]; projects: Project[];
   onSelect: () => void; onDelete: () => void;
   onColorChange: (color: string) => void; onQuickMove: (progress: TaskRecord["progress"]) => void;
 }) {
@@ -86,8 +100,14 @@ function SortableCard({
             {task.blocked && <span className="text-[9px] font-medium text-red-500">BLOCKED</span>}
           </div>
           <div className="font-medium text-slate-800 truncate">{task.taskDescription}</div>
-          <div className="text-[10px] text-slate-400 mt-0.5">
+          <div className="text-[10px] text-slate-400 mt-0.5 space-x-1">
             {task.assignee && <span>{task.assignee}</span>}
+            {task.project && projects.length > 0 && (
+              <span className="inline-flex items-center gap-0.5 text-[9px] bg-slate-100 rounded px-1 py-0.5">
+                <span className="w-1 h-1 rounded-full" style={{ backgroundColor: projects.find((p) => p.id === task.project)?.color || "#94a3b8" }} />
+                {projects.find((p) => p.id === task.project)?.name || task.project}
+              </span>
+            )}
             {task.expectedCompletionDate && (
               <span> &middot; Due {new Date(task.expectedCompletionDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</span>
             )}
@@ -137,7 +157,7 @@ function SortableCard({
   );
 }
 
-export default function KanbanBoard({ tasks, onSelect, onRefresh }: Props) {
+export default function KanbanBoard({ tasks, onSelect, onRefresh, projects = [], selectedProject }: Props) {
   const [localTasks, setLocalTasks] = useState<TaskRecord[]>(tasks);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [showNew, setShowNew] = useState(false);
@@ -312,6 +332,7 @@ export default function KanbanBoard({ tasks, onSelect, onRefresh }: Props) {
                           key={task.id} task={task}
                           color={`${colorDef.bg} ${colorDef.border}`}
                           labels={labels}
+                          projects={projects}
                           onSelect={() => onSelect(task)}
                           onDelete={() => handleArchive(task)}
                           onColorChange={(c) => handleColorChange(task.id, c)}

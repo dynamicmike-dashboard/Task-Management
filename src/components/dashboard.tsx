@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { RefreshCw, Loader2, Eye, EyeOff, Columns3, LayoutDashboard, Clock, CalendarDays, Archive } from "lucide-react";
-import { TaskRecord, FilterState } from "@/lib/types";
+import { TaskRecord, FilterState, Project } from "@/lib/types";
 import { getTasks } from "@/app/actions/teable";
 import { matchesFilters } from "@/lib/filters";
 import KpiTiles from "@/components/kpi-tiles";
@@ -23,6 +23,7 @@ import CalendarView from "@/components/calendar-view";
 import ArchiveView from "@/components/archive-view";
 import SettingsDialog from "@/components/settings-dialog";
 import HelpManual from "@/components/help-manual";
+import ProjectTabs from "@/components/project-tabs";
 
 interface Props {
   initialTasks: TaskRecord[];
@@ -44,8 +45,25 @@ export default function Dashboard({ initialTasks }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [sidePanelTask, setSidePanelTask] = useState<TaskRecord | null>(null);
   const [newTaskDate, setNewTaskDate] = useState<string | null>(null);
+  const [selectedProject, setSelectedProject] = useState<string | null>(null);
+  const [projects, setProjects] = useState<Project[]>([]);
 
-  const active = tasks.filter((t) => !t.archived);
+  const getDescendantIds = (parentId: string): string[] => {
+    const ids: string[] = [parentId];
+    const children = projects.filter((p) => p.parentId === parentId);
+    for (const child of children) {
+      ids.push(...getDescendantIds(child.id));
+    }
+    return ids;
+  };
+
+  const tasksInProject = useMemo(() => {
+    if (!selectedProject) return tasks;
+    const validIds = getDescendantIds(selectedProject);
+    return tasks.filter((t) => t.project && validIds.includes(t.project));
+  }, [tasks, selectedProject, projects]);
+
+  const active = tasksInProject.filter((t) => !t.archived);
   const archived = tasks.filter((t) => t.archived);
 
   const filtered = useMemo(
@@ -109,6 +127,19 @@ export default function Dashboard({ initialTasks }: Props) {
     });
   }, []);
 
+  const getProjectPath = (projectId: string): string => {
+    if (!projectId) return "";
+    const parts: string[] = [];
+    let id: string | null = projectId;
+    while (id) {
+      const p = projects.find((pr) => pr.id === id);
+      if (!p) break;
+      parts.unshift(p.name);
+      id = p.parentId;
+    }
+    return parts.join(" > ");
+  };
+
   const handleCreated = useCallback((task: TaskRecord) => {
     setTasks((prev) => [task, ...prev]);
   }, []);
@@ -135,7 +166,12 @@ export default function Dashboard({ initialTasks }: Props) {
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
             <h1 className="text-base font-semibold text-slate-800 flex items-center gap-2">
-              {view === "kanban" ? "Kanban Board" :
+              {selectedProject ? (
+                <span className="flex items-center gap-1">
+                  <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: projects.find((p) => p.id === selectedProject)?.color || "#94a3b8" }} />
+                  {getProjectPath(selectedProject)}
+                </span>
+              ) : view === "kanban" ? "Kanban Board" :
                view === "calendar" ? "Calendar" :
                view === "archive" ? "Archive" :
                "Dashboard"}
@@ -164,7 +200,7 @@ export default function Dashboard({ initialTasks }: Props) {
             )}
             <SettingsDialog />
             <HelpManual />
-            <CreateTaskDialog onCreated={handleCreated} initialDate={newTaskDate} onOpenChange={(open) => { if (!open) setNewTaskDate(null); }} />
+            <CreateTaskDialog onCreated={handleCreated} initialDate={newTaskDate} onOpenChange={(open) => { if (!open) setNewTaskDate(null); }} projects={projects} selectedProject={selectedProject} />
             {view === "archive" && (
               <button onClick={refresh} disabled={loading} title="Refresh" className="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-50 flex items-center gap-1">
                 {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
@@ -172,6 +208,14 @@ export default function Dashboard({ initialTasks }: Props) {
             )}
           </div>
         </div>
+
+        <ProjectTabs
+          tasks={tasks}
+          selectedProject={selectedProject}
+          onSelectProject={setSelectedProject}
+          onProjectsChange={setProjects}
+        />
+
         <div className="flex bg-slate-100 rounded-lg p-0.5 text-xs overflow-x-auto scrollbar-none snap-x snap-mandatory w-full sm:w-auto">
           <button onClick={() => setView("dashboard")} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md transition-all snap-start shrink-0 ${view === "dashboard" ? "bg-white text-slate-800 shadow-sm font-medium" : "text-slate-500 hover:text-slate-700"}`}>
             <LayoutDashboard size={14} /> Dash
@@ -189,7 +233,7 @@ export default function Dashboard({ initialTasks }: Props) {
       </div>
 
       {view === "kanban" ? (
-        <KanbanBoard tasks={active} onSelect={setSidePanelTask} onRefresh={refresh} />
+        <KanbanBoard tasks={active} onSelect={setSidePanelTask} onRefresh={refresh} projects={projects} selectedProject={selectedProject} />
       ) : view === "calendar" ? (
         <CalendarView tasks={active} onSelect={setSidePanelTask} onAddTask={(date) => setNewTaskDate(date)} />
       ) : view === "archive" ? (
@@ -227,11 +271,12 @@ export default function Dashboard({ initialTasks }: Props) {
             selected={selected}
             onToggleSelect={toggleSelect}
             onSelect={setSidePanelTask}
+            projects={projects}
           />
         </>
       )}
 
-      <TaskSidePanel task={sidePanelTask} onClose={() => setSidePanelTask(null)} onUpdated={handleUpdated} />
+      <TaskSidePanel task={sidePanelTask} onClose={() => setSidePanelTask(null)} onUpdated={handleUpdated} projects={projects} />
     </div>
   );
 }

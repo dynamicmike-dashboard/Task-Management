@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { X, Check, Loader2, Trash2, Archive, RotateCcw, History, Circle, Clock, CheckCircle2, AlertTriangle } from "lucide-react";
-import { TaskRecord, Progress, ActivityRecord } from "@/lib/types";
+import { TaskRecord, Progress, ActivityRecord, Project } from "@/lib/types";
 import { updateTask, deleteTaskAction, archiveTask, restoreTask, getTaskActivity } from "@/app/actions/teable";
 import { computeRisk, riskColor } from "@/lib/risk";
 import { isOverdue } from "@/lib/filters";
@@ -11,9 +11,22 @@ interface Props {
   task: TaskRecord | null;
   onClose: () => void;
   onUpdated: () => void;
+  projects?: Project[];
 }
 
-export default function TaskSidePanel({ task, onClose, onUpdated }: Props) {
+function getFullPath(projectId: string, projects: Project[]): string {
+  const parts: string[] = [];
+  let id: string | null = projectId;
+  while (id) {
+    const p = projects.find((pr) => pr.id === id);
+    if (!p) break;
+    parts.unshift(p.name);
+    id = p.parentId;
+  }
+  return parts.join(" > ");
+}
+
+export default function TaskSidePanel({ task, onClose, onUpdated, projects = [] }: Props) {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [feedback, setFeedback] = useState("");
@@ -170,6 +183,22 @@ export default function TaskSidePanel({ task, onClose, onUpdated }: Props) {
         {field("Task Summary", t.taskSummary, "taskSummary")}
         {field("Assignee", t.assignee, "assignee")}
         {field("Progress", t.progress, "progress", "select", ["Not Started", "In Progress", "Completed"])}
+
+        {projects.length > 0 && (
+          <div className={`px-4 py-2 ${"project" in form ? "bg-amber-50 -mx-1 px-5 rounded border border-amber-200" : ""}`}>
+            <label className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Project</label>
+            <select
+              value={String("project" in form ? form.project ?? "" : t.project ?? "")}
+              onChange={(e) => handleChange("project", e.target.value || null)}
+              className="w-full text-xs border-0 bg-transparent p-0 focus:outline-none focus:ring-0 mt-0.5 text-slate-800"
+            >
+              <option value="">No project</option>
+              {projects.sort((a, b) => a.sortOrder - b.sortOrder).map((p) => (
+                <option key={p.id} value={p.id}>{getFullPath(p.id, projects)}</option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <div className="px-4 py-2">
           <label className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Priority</label>
