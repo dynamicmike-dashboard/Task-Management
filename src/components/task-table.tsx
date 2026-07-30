@@ -29,6 +29,18 @@ function getFullPath(projectId: string, projects: Project[]): string {
   return parts.join(" > ");
 }
 
+function getAncestorDepth(projectId: string, projects: Project[]): number {
+  let depth = 0;
+  let id: string | null = projectId;
+  while (id) {
+    const p = projects.find((pr) => pr.id === id);
+    if (!p || !p.parentId) break;
+    depth++;
+    id = p.parentId;
+  }
+  return depth;
+}
+
 type SortKey = keyof Pick<TaskRecord, "taskDescription" | "assignee" | "progress" | "expectedCompletionDate" | "startDate" | "project">;
 
 const SORT_LABELS: Record<SortKey, string> = {
@@ -347,14 +359,26 @@ export default function TaskTable({ tasks, filters, onFilters, selected, onToggl
                   <td className="px-2 py-2 text-slate-600" onClick={() => onSelect(task)}>
                     {task.assignee || <span className="text-slate-300">—</span>}
                   </td>
-                  <td className="px-2 py-2" onClick={() => onSelect(task)}>
-                    {task.project && projects && projects.length > 0 ? (
-                      <span className="flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: projects.find((p) => p.id === task.project)?.color || "#94a3b8" }} />
-                        <span className="text-[10px] text-slate-500 truncate max-w-[100px]">
-                          {getFullPath(task.project, projects)}
-                        </span>
-                      </span>
+                  <td className="px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                    {projects.length > 0 ? (
+                      <select
+                        value={task.project || ""}
+                        onChange={async (e) => {
+                          const val = e.target.value;
+                          setSavingId(task.id);
+                          await updateTask(task.id, { project: val || null });
+                          setSavingId(null);
+                        }}
+                        className="text-[10px] border border-slate-200 rounded-md px-1 py-1 bg-white hover:border-slate-300 cursor-pointer max-w-[110px]"
+                        style={task.project ? { borderLeftColor: projects.find((p) => p.id === task.project)?.color, borderLeftWidth: "3px" } : {}}
+                      >
+                        <option value="">—</option>
+                        {projects.sort((a, b) => a.sortOrder - b.sortOrder).map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {'  '.repeat(getAncestorDepth(p.id, projects))}{getFullPath(p.id, projects)}
+                          </option>
+                        ))}
+                      </select>
                     ) : (
                       <span className="text-slate-300">—</span>
                     )}

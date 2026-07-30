@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import { Plus, X, Edit3, Trash2, ChevronRight, FolderDown, GripVertical } from "lucide-react";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { Plus, X, Edit3, Trash2, ChevronRight, MoreHorizontal, Check } from "lucide-react";
 import { Project, TaskRecord } from "@/lib/types";
 import { getProjects, saveProjects } from "@/app/actions/teable";
 
@@ -22,180 +22,115 @@ function loadProjects(): Project[] {
   } catch { return []; }
 }
 
-function saveProjectsLocal(projects: Project[]) {
-  localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
-}
-
 export default function ProjectTabs({ tasks, selectedProject, onSelectProject, onProjectsChange }: Props) {
   const [projects, setProjects] = useState<Project[]>([]);
-  const [showManager, setShowManager] = useState(false);
-  const [editId, setEditId] = useState<string | null>(null);
-  const [editName, setEditName] = useState("");
-  const [editColor, setEditColor] = useState("#3b82f6");
-  const [editParentId, setEditParentId] = useState<string | null>(null);
+  const [managerOpen, setManagerOpen] = useState(false);
+  const [renameId, setRenameId] = useState<string | null>(null);
+  const [renameVal, setRenameVal] = useState("");
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState("");
 
-  useEffect(() => {
-    setProjects(loadProjects());
-  }, []);
-
-  useEffect(() => {
-    onProjectsChange(projects);
-  }, [projects]);
-
-  const rootProjects = useMemo(() =>
-    projects.filter((p) => !p.parentId).sort((a, b) => a.sortOrder - b.sortOrder),
-    [projects]
-  );
+  useEffect(() => { setProjects(loadProjects()); }, []);
+  useEffect(() => { onProjectsChange(projects); }, [projects]);
+  useEffect(() => { saveProjectsLocal(projects); }, [projects]);
 
   const getChildren = (parentId: string) =>
     projects.filter((p) => p.parentId === parentId).sort((a, b) => a.sortOrder - b.sortOrder);
 
-  const getFullPath = (projectId: string): string => {
-    const parts: string[] = [];
-    let id: string | null = projectId;
-    while (id) {
-      const p = projects.find((pr) => pr.id === id);
-      if (!p) break;
-      parts.unshift(p.name);
-      id = p.parentId;
-    }
-    return parts.join(" > ");
-  };
-
-  const getProjectColor = (projectId: string): string => {
-    const p = projects.find((pr) => pr.id === projectId);
-    return p?.color || "#94a3b8";
+  const getAncestors = (id: string | null): Project[] => {
+    if (!id) return [];
+    const p = projects.find((pr) => pr.id === id);
+    if (!p) return [];
+    return [...getAncestors(p.parentId), p];
   };
 
   const getDescendantIds = (parentId: string): string[] => {
     const ids: string[] = [parentId];
-    for (const child of getChildren(parentId)) {
-      ids.push(...getDescendantIds(child.id));
-    }
+    for (const child of getChildren(parentId)) ids.push(...getDescendantIds(child.id));
     return ids;
   };
 
   const taskCount = (projectId: string) => {
-    const descendantIds = getDescendantIds(projectId);
-    return tasks.filter((t) => descendantIds.includes(t.project || "none")).length;
+    const ids = getDescendantIds(projectId);
+    return tasks.filter((t) => t.project && ids.includes(t.project)).length;
   };
 
-  const handleEditStart = (p?: Project) => {
-    if (p) {
-      setEditId(p.id);
-      setEditName(p.name);
-      setEditColor(p.color);
-      setEditParentId(p.parentId);
-    } else {
-      setEditId(null);
-      setEditName("");
-      setEditColor("#3b82f6");
-      setEditParentId(null);
-    }
+  const selected = projects.find((p) => p.id === selectedProject);
+  const ancestors = getAncestors(selectedProject);
+  const activeChildren = selected ? getChildren(selected.id) : [];
+
+  // --- CRUD ---
+  const addProject = (parentId: string | null) => {
+    const name = prompt("Project name:");
+    if (!name?.trim()) return;
+    setProjects((prev) => [...prev, {
+      id: "proj_" + Date.now(), name: name.trim(), color: "#3b82f6",
+      parentId, sortOrder: prev.filter((p) => p.parentId === parentId).length,
+    }]);
   };
 
-  const handleSave = () => {
-    if (!editName.trim()) return;
-    if (editId) {
-      setProjects(projects.map((p) =>
-        p.id === editId ? { ...p, name: editName.trim(), color: editColor, parentId: editParentId } : p
-      ));
-    } else {
-      const newP: Project = {
-        id: "proj_" + Date.now(),
-        name: editName.trim(),
-        color: editColor,
-        parentId: editParentId,
-        sortOrder: projects.filter((p) => p.parentId === editParentId).length,
-      };
-      setProjects([...projects, newP]);
-    }
-    setEditId(null);
-    setEditName("");
-    setEditColor("#3b82f6");
-    setEditParentId(null);
-  };
-
-  const handleDelete = (id: string) => {
-    const project = projects.find((p) => p.id === id);
-    if (!project) return;
-    const childCount = getChildren(id).length;
-    const msg = childCount > 0
-      ? `Delete "${project.name}" and its ${childCount} sub-project(s)?`
-      : `Delete "${project.name}"?`;
+  const deleteProject = (id: string) => {
+    const p = projects.find((pr) => pr.id === id);
+    if (!p) return;
+    const children = getDescendantIds(id).filter((d) => d !== id);
+    const msg = children.length > 0
+      ? `Delete "${p.name}" and ${children.length} sub-project(s)?`
+      : `Delete "${p.name}"?`;
     if (!confirm(msg)) return;
-    const idsToRemove = new Set([id, ...getDescendantIds(id).filter((did) => did !== id)]);
-    setProjects(projects.filter((p) => !idsToRemove.has(p.id)));
-    if (selectedProject && idsToRemove.has(selectedProject)) {
-      onSelectProject(null);
-    }
+    const remove = new Set([id, ...children]);
+    setProjects((prev) => prev.filter((pr) => !remove.has(pr.id)));
+    if (selectedProject && remove.has(selectedProject)) onSelectProject(null);
   };
 
-  const moveUp = (id: string) => {
-    setProjects((prev) => {
-      const p = prev.find((pr) => pr.id === id);
-      if (!p) return prev;
-      const siblings = prev.filter((pr) => pr.parentId === p.parentId).sort((a, b) => a.sortOrder - b.sortOrder);
-      const idx = siblings.findIndex((s) => s.id === id);
-      if (idx <= 0) return prev;
-      const newOrder = [...siblings];
-      [newOrder[idx - 1], newOrder[idx]] = [newOrder[idx], newOrder[idx - 1]];
-      return prev.map((pr) => {
-        const ni = newOrder.findIndex((n) => n.id === pr.id);
-        return ni >= 0 ? { ...pr, sortOrder: ni } : pr;
-      });
-    });
+  const renameProject = (id: string) => {
+    if (!renameVal.trim()) return;
+    setProjects((prev) => prev.map((p) => p.id === id ? { ...p, name: renameVal.trim() } : p));
+    setRenameId(null);
   };
 
-  const moveDown = (id: string) => {
-    setProjects((prev) => {
-      const p = prev.find((pr) => pr.id === id);
-      if (!p) return prev;
-      const siblings = prev.filter((pr) => pr.parentId === p.parentId).sort((a, b) => a.sortOrder - b.sortOrder);
-      const idx = siblings.findIndex((s) => s.id === id);
-      if (idx < 0 || idx >= siblings.length - 1) return prev;
-      const newOrder = [...siblings];
-      [newOrder[idx], newOrder[idx + 1]] = [newOrder[idx + 1], newOrder[idx]];
-      return prev.map((pr) => {
-        const ni = newOrder.findIndex((n) => n.id === pr.id);
-        return ni >= 0 ? { ...pr, sortOrder: ni } : pr;
-      });
-    });
+  const changeColor = (id: string) => {
+    const p = projects.find((pr) => pr.id === id);
+    if (!p) return;
+    const color = prompt("Hex color (e.g. #ff0000):", p.color);
+    if (!color?.trim()) return;
+    setProjects((prev) => prev.map((pr) => pr.id === id ? { ...pr, color: color.trim() } : pr));
   };
 
-  const handleSyncToDb = async () => {
-    setSyncing(true);
-    setSyncMsg("");
+  const handleSync = async () => {
+    setSyncing(true); setSyncMsg("");
     const res = await saveProjects(projects);
-    if (res.ok) {
-      setSyncMsg("Saved to database");
-    } else {
-      setSyncMsg("Sync failed: " + res.error);
-    }
+    setSyncMsg(res.ok ? "Saved to DB" : "Failed: " + res.error);
     setSyncing(false);
     setTimeout(() => setSyncMsg(""), 3000);
   };
 
-  const handleLoadFromDb = async () => {
-    setSyncing(true);
-    setSyncMsg("");
+  const handleLoad = async () => {
+    setSyncing(true); setSyncMsg("");
     const res = await getProjects();
     if (res.projects.length > 0) {
       setProjects(res.projects);
-      saveProjectsLocal(res.projects);
-      setSyncMsg("Loaded from database");
-    } else {
-      setSyncMsg("No projects found in database");
-    }
+      setSyncMsg("Loaded from DB");
+    } else setSyncMsg("No projects in DB");
     setSyncing(false);
     setTimeout(() => setSyncMsg(""), 3000);
   };
 
+  const tabColor = (id: string) => projects.find((p) => p.id === id)?.color || "#94a3b8";
+
+  if (projects.length === 0) {
+    return (
+      <div className="flex items-center gap-2 text-xs text-slate-400">
+        <button onClick={() => addProject(null)} className="flex items-center gap-1 px-2 py-1 rounded hover:bg-blue-50 hover:text-blue-600">
+          <Plus size={12} /> Create your first project
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-1 overflow-x-auto scrollbar-none pb-0.5">
+    <div className="space-y-1">
+      {/* Row 1: Top-level tabs */}
+      <div className="flex items-center gap-0.5 overflow-x-auto scrollbar-none">
         <button
           onClick={() => onSelectProject(null)}
           className={`flex items-center gap-1 px-2.5 py-1.5 rounded-t-lg text-xs font-medium transition-all shrink-0 ${
@@ -207,161 +142,191 @@ export default function ProjectTabs({ tasks, selectedProject, onSelectProject, o
           All Tasks
           <span className="text-[10px] text-slate-400 ml-0.5">({tasks.length})</span>
         </button>
-        {rootProjects.map((project) => (
-          <TabButton
-            key={project.id}
-            project={project}
-            isSelected={selectedProject === project.id}
-            onClick={() => onSelectProject(project.id)}
-            taskCount={taskCount(project.id)}
-            childProjects={getChildren(project.id)}
-            getChildren={getChildren}
-            getProjectColor={getProjectColor}
-            taskCountFn={taskCount}
-            onSelectProject={onSelectProject}
+        {projects.filter((p) => !p.parentId).sort((a, b) => a.sortOrder - b.sortOrder).map((p) => (
+          <Tab key={p.id} project={p} selected={selectedProject === p.id}
+            onClick={() => onSelectProject(p.id)}
+            color={p.color} taskCount={taskCount(p.id)}
+            hasChildren={getChildren(p.id).length > 0}
           />
         ))}
-        <button
-          onClick={() => { handleEditStart(); setShowManager(true); }}
-          className="flex items-center gap-0.5 px-2 py-1.5 text-xs text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded shrink-0"
-          title="Manage projects"
-        >
+        <button onClick={() => addProject(null)} className="flex items-center gap-0.5 px-2 py-1.5 text-xs text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded shrink-0" title="Add top-level project">
           <Plus size={12} /> Tab
-        </button>
-        <button
-          onClick={() => setShowManager(!showManager)}
-          className="flex items-center gap-0.5 px-2 py-1.5 text-xs text-slate-400 hover:text-slate-600 rounded shrink-0"
-          title="Project settings"
-        >
-          <Edit3 size={11} />
         </button>
       </div>
 
-      {/* Manager dialog */}
-      {showManager && (
-        <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-3 shadow-sm">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-semibold text-slate-700">Manage Projects</h3>
-            <div className="flex items-center gap-1">
-              <button onClick={handleLoadFromDb} disabled={syncing} className="text-[10px] px-1.5 py-0.5 text-slate-500 hover:text-blue-600 rounded">
-                Load from DB
-              </button>
-              <button onClick={handleSyncToDb} disabled={syncing} className="text-[10px] px-1.5 py-0.5 text-emerald-600 hover:bg-emerald-50 rounded">
-                {syncing ? "..." : "Save to DB"}
-              </button>
-              {syncMsg && <span className="text-[10px] text-slate-400">{syncMsg}</span>}
-              <button onClick={() => setShowManager(false)} className="text-slate-400 hover:text-slate-600"><X size={14} /></button>
-            </div>
-          </div>
-
-          {/* Add / Edit form */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <input
-              value={editName}
-              onChange={(e) => setEditName(e.target.value)}
-              placeholder="Project name..."
-              className="flex-1 min-w-[120px] text-xs border border-slate-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400"
-            />
-            <input
-              type="color"
-              value={editColor}
-              onChange={(e) => setEditColor(e.target.value)}
-              className="w-7 h-7 p-0.5 border border-slate-200 rounded cursor-pointer"
-            />
-            <select
-              value={editParentId ?? ""}
-              onChange={(e) => setEditParentId(e.target.value || null)}
-              className="text-xs border border-slate-200 rounded px-2 py-1.5 bg-white"
+      {/* Row 2: Breadcrumb + sub-tabs */}
+      {selectedProject && (
+        <div className="flex items-center gap-1 overflow-x-auto scrollbar-none pb-0.5">
+          {/* Breadcrumb to parent */}
+          {ancestors.length > 1 && ancestors.slice(0, -1).map((a) => (
+            <button key={a.id} onClick={() => onSelectProject(a.id)}
+              className="flex items-center gap-1 text-[10px] text-slate-400 hover:text-blue-600 shrink-0"
             >
-              <option value="">Top level (no parent)</option>
-              {projects.filter((p) => p.id !== editId).map((p) => (
-                <option key={p.id} value={p.id}>{getFullPath(p.id)}</option>
-              ))}
-            </select>
-            <button onClick={handleSave} className="text-xs px-2.5 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700">
-              {editId ? "Update" : "Add"}
+              <ChevronRight size={10} className="text-slate-300 -ml-0.5" />
+              {a.name}
             </button>
-            {editId && (
-              <button onClick={() => handleEditStart()} className="text-xs px-2 py-1.5 text-slate-500 hover:text-slate-700 rounded border border-slate-200">
-                Cancel
-              </button>
-            )}
-          </div>
-
-          {/* Project list */}
-          {projects.length > 0 && (
-            <div className="max-h-48 overflow-y-auto space-y-0.5">
-              {projects.sort((a, b) => a.sortOrder - b.sortOrder).map((p) => (
-                <div key={p.id} className="flex items-center gap-1.5 text-xs py-1 px-1 rounded hover:bg-slate-50 group">
-                  <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: p.color }} />
-                  <span className="text-slate-600 text-[10px]">{getFullPath(p.id)}</span>
-                  <span className="text-[10px] text-slate-400 ml-auto">{taskCount(p.id)} tasks</span>
-                  <button onClick={() => moveUp(p.id)} className="text-slate-300 hover:text-slate-600 opacity-0 group-hover:opacity-100" title="Move up">
-                    <ChevronRight size={10} className="rotate-[-90deg]" />
-                  </button>
-                  <button onClick={() => moveDown(p.id)} className="text-slate-300 hover:text-slate-600 opacity-0 group-hover:opacity-100" title="Move down">
-                    <ChevronRight size={10} className="rotate-90" />
-                  </button>
-                  <button onClick={() => { handleEditStart(p); }} className="text-slate-300 hover:text-blue-600 opacity-0 group-hover:opacity-100">
-                    <Edit3 size={10} />
-                  </button>
-                  <button onClick={() => handleDelete(p.id)} className="text-slate-300 hover:text-red-600 opacity-0 group-hover:opacity-100">
-                    <Trash2 size={10} />
-                  </button>
-                </div>
+          ))}
+          {/* Active project label */}
+          {selected && (
+            <span className="flex items-center gap-1 text-[10px] font-medium text-slate-600 shrink-0 mr-1">
+              <ChevronRight size={10} className="text-slate-300 -ml-0.5" />
+              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: selected.color }} />
+              {selected.name}
+            </span>
+          )}
+          {/* Sub-project tabs */}
+          {activeChildren.length > 0 && (
+            <div className="flex items-center gap-0.5 ml-0.5 pl-1 border-l border-slate-200">
+              {activeChildren.map((child) => (
+                <Tab key={child.id} project={child} selected={selectedProject === child.id}
+                  onClick={() => onSelectProject(child.id)}
+                  color={child.color} taskCount={taskCount(child.id)}
+                  hasChildren={getChildren(child.id).length > 0} small
+                />
               ))}
+              <button onClick={() => addProject(selectedProject!)}
+                className="flex items-center gap-0.5 px-1.5 py-1 text-[10px] text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded shrink-0"
+                title="Add sub-project"
+              >
+                <Plus size={10} />
+              </button>
             </div>
           )}
+          {/* Quick action buttons */}
+          <div className="ml-auto flex items-center gap-0.5 shrink-0">
+            {!activeChildren.length && (
+              <button onClick={() => addProject(selectedProject!)}
+                className="text-[10px] px-1.5 py-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded flex items-center gap-0.5"
+              >
+                <Plus size={10} /> Sub
+              </button>
+            )}
+            <TabMenu projectId={selectedProject!} projects={projects}
+              onRename={(id) => { setRenameId(id); setRenameVal(projects.find((p) => p.id === id)?.name || ""); }}
+              onChangeColor={changeColor} onDelete={deleteProject} onAddSub={addProject}
+            />
+          </div>
         </div>
       )}
+
+      {/* Inline rename */}
+      {renameId && (
+        <div className="flex items-center gap-1.5 p-1.5 bg-white border border-slate-200 rounded text-xs">
+          <input value={renameVal} onChange={(e) => setRenameVal(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") renameProject(renameId); if (e.key === "Escape") setRenameId(null); }}
+            className="flex-1 border border-slate-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400" autoFocus
+          />
+          <button onClick={() => renameProject(renameId)} className="px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"><Check size={12} /></button>
+          <button onClick={() => setRenameId(null)} className="px-2 py-1 text-slate-400 hover:text-slate-600"><X size={12} /></button>
+        </div>
+      )}
+
+      {/* Manager toggle */}
+      {managerOpen && (
+        <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-2 shadow-sm text-xs">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-slate-700">All Projects</h3>
+            <div className="flex items-center gap-1">
+              <button onClick={handleLoad} disabled={syncing} className="text-[10px] px-1.5 py-0.5 text-slate-500 hover:text-blue-600 rounded">Load DB</button>
+              <button onClick={handleSync} disabled={syncing} className="text-[10px] px-1.5 py-0.5 text-emerald-600 hover:bg-emerald-50 rounded">{syncing ? "..." : "Save DB"}</button>
+              {syncMsg && <span className="text-[10px] text-slate-400">{syncMsg}</span>}
+              <button onClick={() => setManagerOpen(false)} className="text-slate-400 hover:text-slate-600"><X size={14} /></button>
+            </div>
+          </div>
+          {projects.sort((a, b) => a.sortOrder - b.sortOrder).map((p) => (
+            <div key={p.id} className="flex items-center gap-1.5 py-0.5 group">
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: p.color }} />
+              <span className="text-slate-600 text-[10px]">{getAncestors(p.id).map((a) => a.name).join(" > ")}</span>
+              <span className="text-[10px] text-slate-400 ml-auto">{taskCount(p.id)} tasks</span>
+              <button onClick={() => { setRenameId(p.id); setRenameVal(p.name); }} className="text-slate-300 hover:text-blue-600 opacity-0 group-hover:opacity-100"><Edit3 size={10} /></button>
+              <button onClick={() => deleteProject(p.id)} className="text-slate-300 hover:text-red-600 opacity-0 group-hover:opacity-100"><Trash2 size={10} /></button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Manager toggle button */}
+      <div className="flex items-center gap-1">
+        {projects.length > 0 && (
+          <button onClick={() => setManagerOpen(!managerOpen)}
+            className="text-[10px] text-slate-400 hover:text-slate-600 px-1 py-0.5 rounded"
+          >
+            {managerOpen ? "Close manager" : "Project manager..."}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
 
-function TabButton({
-  project, isSelected, onClick, taskCount, childProjects, getChildren, getProjectColor, taskCountFn, onSelectProject,
-}: {
-  project: Project; isSelected: boolean; onClick: () => void; taskCount: number;
-  childProjects: Project[]; getChildren: (id: string) => Project[];
-  getProjectColor: (id: string) => string; taskCountFn: (id: string) => number;
-  onSelectProject: (id: string | null) => void;
+function saveProjectsLocal(projects: Project[]) {
+  localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
+}
+
+// Simple tab pill
+function Tab({ project, selected, onClick, color, taskCount, hasChildren, small }: {
+  project: Project; selected: boolean; onClick: () => void; color: string;
+  taskCount: number; hasChildren: boolean; small?: boolean;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-1 rounded-t-lg font-medium transition-all shrink-0 whitespace-nowrap ${
+        small ? "text-[10px] px-1.5 py-1" : "text-xs px-2.5 py-1.5"
+      } ${
+        selected
+          ? "bg-white text-slate-800 shadow-sm border border-b-0 border-slate-200"
+          : "text-slate-400 hover:text-slate-600 hover:bg-slate-100 border border-b-0 border-transparent"
+      }`}
+      style={selected ? { borderTopColor: color, borderTopWidth: "2px" } : {}}
+    >
+      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
+      <span className="truncate max-w-[80px]">{project.name}</span>
+      <span className="text-[10px] text-slate-400 ml-0.5">({taskCount})</span>
+      {hasChildren && <ChevronRight size={10} className="text-slate-300 ml-0.5" />}
+    </button>
+  );
+}
+
+// Dropdown menu for a project tab
+function TabMenu({ projectId, projects, onRename, onChangeColor, onDelete, onAddSub }: {
+  projectId: string; projects: Project[];
+  onRename: (id: string) => void; onChangeColor: (id: string) => void;
+  onDelete: (id: string) => void; onAddSub: (parentId: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handle = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handle);
+    return () => document.removeEventListener("mousedown", handle);
+  }, []);
 
   return (
-    <div className="relative shrink-0">
-      <button
-        onClick={onClick}
-        onContextMenu={(e) => { e.preventDefault(); setExpanded(!expanded); }}
-        className={`flex items-center gap-1 px-2.5 py-1.5 rounded-t-lg text-xs font-medium transition-all border border-b-0 ${
-          isSelected
-            ? "bg-white text-slate-800 shadow-sm border-slate-200"
-            : "text-slate-500 hover:text-slate-700 hover:bg-slate-100 border-transparent"
-        }`}
-        style={isSelected ? { borderTopColor: project.color, borderTopWidth: "2px" } : {}}
+    <div ref={ref} className="relative">
+      <button onClick={() => setOpen(!open)}
+        className="text-slate-300 hover:text-slate-600 p-0.5 rounded hover:bg-slate-100" title="Project actions"
       >
-        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: project.color }} />
-        <span className="truncate max-w-[100px]">{project.name}</span>
-        <span className="text-[10px] text-slate-400 ml-0.5">({taskCount})</span>
-        {childProjects.length > 0 && (
-          <ChevronRight size={10} className={`text-slate-300 transition-transform ${expanded ? "rotate-90" : ""}`} />
-        )}
+        <MoreHorizontal size={12} />
       </button>
-      {expanded && childProjects.length > 0 && (
-        <div className="absolute top-full left-0 z-50 mt-0.5 bg-white border border-slate-200 rounded-lg shadow-lg p-1 min-w-[180px]">
-          {childProjects.map((child) => (
-            <div key={child.id}>
-              <button
-                onClick={() => { onSelectProject(child.id); setExpanded(false); }}
-                className="flex items-center gap-1.5 w-full text-left px-2 py-1.5 text-xs rounded hover:bg-slate-50 text-slate-600"
-              >
-                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: child.color }} />
-                <span className="flex-1 truncate">{child.name}</span>
-                <span className="text-[10px] text-slate-400">{taskCountFn(child.id)}</span>
-                {getChildren(child.id).length > 0 && <ChevronRight size={10} className="text-slate-300" />}
-              </button>
-            </div>
-          ))}
+      {open && (
+        <div className="absolute right-0 top-full z-50 mt-0.5 bg-white border border-slate-200 rounded-lg shadow-lg p-0.5 min-w-[130px] text-xs" onClick={() => setOpen(false)}>
+          <button onClick={() => onAddSub(projectId)} className="w-full flex items-center gap-1.5 px-2 py-1.5 hover:bg-slate-50 rounded text-slate-600">
+            <Plus size={10} /> Add sub-project
+          </button>
+          <button onClick={() => onRename(projectId)} className="w-full flex items-center gap-1.5 px-2 py-1.5 hover:bg-slate-50 rounded text-slate-600">
+            <Edit3 size={10} /> Rename
+          </button>
+          <button onClick={() => onChangeColor(projectId)} className="w-full flex items-center gap-1.5 px-2 py-1.5 hover:bg-slate-50 rounded text-slate-600">
+            <div className="w-2.5 h-2.5 rounded-full border border-slate-300" style={{ backgroundColor: projects.find((p) => p.id === projectId)?.color }} />
+            Color
+          </button>
+          <button onClick={() => onDelete(projectId)} className="w-full flex items-center gap-1.5 px-2 py-1.5 hover:bg-red-50 rounded text-red-600">
+            <Trash2 size={10} /> Delete
+          </button>
         </div>
       )}
     </div>
